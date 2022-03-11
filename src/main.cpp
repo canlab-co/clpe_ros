@@ -8,7 +8,7 @@
 #include <sensor_msgs/msg/image.hpp>
 
 // TODO: docs say 95 bytes, but reference sheet is 107 bytes
-struct EepromData {
+struct __attribute__((packed)) EepromData {
   uint16_t signature_code;
   uint64_t version;
   uint32_t calibration_model;
@@ -29,7 +29,7 @@ struct EepromData {
   uint8_t reserved2[8];
   uint16_t checksum;
   uint8_t production_date[11];
-} __attribute((packed)) __;
+};
 
 template <typename ClpeClientApi>
 class ClpeNode : public rclcpp::Node
@@ -65,6 +65,7 @@ public:
 
   sensor_msgs::msg::CameraInfo GetCameraInfo(int cam_id)
   {
+    // calibration may change anytime for self calibrating systems, so we cannot cache the cam info.
     sensor_msgs::msg::CameraInfo cam_info;
     cam_info.width = 1920;
     cam_info.height = 1080;
