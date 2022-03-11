@@ -66,8 +66,8 @@ public:
       RCLCPP_WARN(this->get_logger(),
                   "Failed to get camera frame ( " + std::to_string(result) + " )");
     }
-    image.data.reserve(size);
-    memcpy(image.data.data(), buffer, size);
+    // TODO: confirm that the buffer is valid for duration of the publish
+    image.data = std::vector<unsigned char>(buffer, buffer + size);
     image.encoding = sensor_msgs::image_encodings::YUV422;
     image.width = 1920;
     image.height = 1080;
