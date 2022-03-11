@@ -52,15 +52,6 @@ public:
         RCLCPP_INFO(this->get_logger(), "Successfully initialized");
       }
     }
-
-    // start clpe stream
-    {
-      const auto result = this->clpe_api.Clpe_StartStream([](auto...) { return 0; }, 1, 1, 1, 1, 0);
-      if (result != 0) {
-        RCLCPP_FATAL(this->get_logger(), "Failed to start streaming");
-        exit(result);
-      }
-    }
   }
 
   sensor_msgs::msg::CameraInfo GetCameraInfo(int cam_id)
@@ -164,7 +155,7 @@ int main(int argc, char ** argv)
 
   // start publishing
   rclcpp::TimerBase::SharedPtr pub_timer;
-  node->clpe_api.Clpe_StartStream(
+  const auto result = node->clpe_api.Clpe_StartStream(
       [](unsigned int inst, unsigned char * buffer, unsigned int size,
          struct timeval * frame_us) -> int {
         const auto image = node->CreateImageMsg(buffer, size);
@@ -174,6 +165,10 @@ int main(int argc, char ** argv)
         return 0;
       },
       1, 1, 1, 1, 0);
+  if (result != 0) {
+    RCLCPP_FATAL(node->get_logger(), "Failed to start streaming");
+    exit(result);
+  }
 
   rclcpp::spin(node);
 
