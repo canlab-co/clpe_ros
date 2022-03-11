@@ -7,6 +7,30 @@
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <sensor_msgs/msg/image.hpp>
 
+// TODO: docs say 95 bytes, but reference sheet is 107 bytes
+struct EepromData {
+  uint16_t signature_code;
+  uint64_t version;
+  uint32_t calibration_model;
+  float fx;
+  float fy;
+  float cx;
+  float cy;
+  float k1;
+  float k2;
+  float k3;
+  float k4;
+  float rms;
+  float fov;
+  float calibration_temperature;
+  uint8_t reserved1[20];
+  float p1;
+  float p2;
+  uint8_t reserved2[8];
+  uint16_t checksum;
+  uint8_t production_date[11];
+} __attribute((packed)) __;
+
 template <typename ClpeClientApi>
 class ClpeNode : public rclcpp::Node
 {
@@ -44,14 +68,18 @@ public:
     sensor_msgs::msg::CameraInfo cam_info;
     cam_info.width = 1920;
     cam_info.height = 1080;
-    // TODO: what's binning?
-    // cam_info.binning_x
-    // cam_info.binning_y
+    EepromData eeprom_data;
+    const auto result =
+        this->clpe_api.Clpe_GetEepromData(cam_id, reinterpret_cast<unsigned char *>(&eeprom_data));
+    if (result != 0) {
+      RCLCPP_FATAL(this->get_logger(),
+                   "Failed to get eeprom data ( " + std::to_string(result) + " )");
+      exit(result);
+    }
+    cam_info.k = {eeprom_data.fx, 0, eeprom_data.cx, 0, eeprom_data.fy, eeprom_data.cy, 0, 0, 1};
     // TODO: is this calibration model in eeprom? It only supports "Jhang" and "FishEye" neither
     // of which is supported by ROS.
     // cam_info.distortion_model
-    // std::array<uint8_t, 95> eeprom_data;
-    // this->clpe_api.Clpe_GetEepromData(i, eeprom_data.data());
     return cam_info;
   }
 
@@ -71,8 +99,8 @@ public:
     image.encoding = sensor_msgs::image_encodings::YUV422;
     image.width = 1920;
     image.height = 1080;
-    // TODO: what's clpe endianess?
-    // image.is_bigendian
+    // assume that each row is same sized.
+    image.step = size / 1080;
     return image;
   }
 
