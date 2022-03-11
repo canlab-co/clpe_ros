@@ -84,17 +84,9 @@ public:
     return cam_info;
   }
 
-  sensor_msgs::msg::Image GetCameraImage(int cam_id)
+  static sensor_msgs::msg::Image CreateImageMsg(unsigned char * buffer, unsigned int size)
   {
     sensor_msgs::msg::Image image;
-    unsigned char * buffer;
-    unsigned int size;
-    timeval timestamp;
-    const auto result = this->clpe_api.Clpe_GetFrameOneCam(cam_id, &buffer, &size, &timestamp);
-    if (result != 0) {
-      RCLCPP_WARN(this->get_logger(),
-                  "Failed to get camera frame ( " + std::to_string(result) + " )");
-    }
     // TODO: confirm that the buffer is valid for duration of the publish
     image.data = std::vector<unsigned char>(buffer, buffer + size);
     image.encoding = sensor_msgs::image_encodings::YUV422;
@@ -105,52 +97,64 @@ public:
     return image;
   }
 
+  sensor_msgs::msg::Image GetCameraImage(int cam_id)
+  {
+    unsigned char * buffer;
+    unsigned int size;
+    timeval timestamp;
+    const auto result = this->clpe_api.Clpe_GetFrameOneCam(cam_id, &buffer, &size, &timestamp);
+    if (result != 0) {
+      RCLCPP_WARN(this->get_logger(),
+                  "Failed to get camera frame ( " + std::to_string(result) + " )");
+    }
+    return this->CreateImageMsg(buffer, size);
+  }
+
 private:
   rclcpp::TimerBase::SharedPtr image_pub_timer_;
 };
+
+int foo(unsigned int inst, unsigned char * buffer, unsigned int size, struct timeval * frame_us)
+{
+  return 0;
+}
+
+// needed because clpe callback does not support user data :(.
+static std::shared_ptr<ClpeNode<ClpeClientApi>> node;
+static std::vector<image_transport::CameraPublisher> camera_pubs;
 
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
 
-  auto node = std::make_shared<ClpeNode<ClpeClientApi>>(ClpeClientApi());
+  node = std::make_shared<ClpeNode<ClpeClientApi>>(ClpeClientApi());
   image_transport::ImageTransport image_transport(node);
 
   // declare ROS params
   {
     rcl_interfaces::msg::ParameterDescriptor desc;
-    desc.description = "The number of images published per second";
-    node->declare_parameter("update_rate", rclcpp::ParameterValue(60.0), desc);
+    desc.description = "Frames per second, must be >=15,<=30";
+    desc.integer_range.emplace_back();
+    auto & range = desc.integer_range.back();
+    range.from_value = 15;
+    range.to_value = 30;
+    range.step = 1;
+    node->declare_parameter("fps", rclcpp::ParameterValue(30), desc);
   }
 
   // create camera publishers
-  std::vector<image_transport::CameraPublisher> camera_pubs;
   camera_pubs.reserve(4);
   for (int i = 0; i < 4; ++i) {
     camera_pubs[i] = image_transport.advertiseCamera("cam_" + std::to_string(i), 10);
   }
 
-  // functor to start publishing
-  rclcpp::TimerBase::SharedPtr pub_timer;
-  const auto StartPublish = [&](double rate) {
-    pub_timer = node->create_wall_timer(std::chrono::duration<double>(1.0 / rate), [&]() {
-      const auto impl = [&](const auto impl) {
-        for (int i = 0; i < 4; ++i) {
-          camera_pubs[i].publish(node->GetCameraImage(i), node->GetCameraInfo(i));
-        }
-      };
-      impl(impl);
-    });
-  };
-
   // listen for param updates
   const auto onSetParamCbHdl =
       node->add_on_set_parameters_callback([&](const std::vector<rclcpp::Parameter> & params) {
         for (const auto & p : params) {
-          if (p.get_name() == "update_rate") {
-            pub_timer.reset();
-            const auto update_rate = p.get_value<double>();
-            StartPublish(update_rate);
+          if (p.get_name() == "fps") {
+            const auto fps = p.get_value<int>();
+            // TODO: header is missing Clpe_SetCamFPS in the docs?
           }
         }
         rcl_interfaces::msg::SetParametersResult result;
@@ -159,8 +163,17 @@ int main(int argc, char ** argv)
       });
 
   // start publishing
-  const auto update_rate = node->get_parameter("update_rate").get_value<double>();
-  StartPublish(update_rate);
+  rclcpp::TimerBase::SharedPtr pub_timer;
+  node->clpe_api.Clpe_StartStream(
+      [](unsigned int inst, unsigned char * buffer, unsigned int size,
+         struct timeval * frame_us) -> int {
+        const auto image = node->CreateImageMsg(buffer, size);
+        const auto cam_info = node->GetCameraInfo(inst);
+        // publishing is threadsafe in ROS
+        camera_pubs[inst].publish(image, cam_info);
+        return 0;
+      },
+      1, 1, 1, 1, 0);
 
   rclcpp::spin(node);
 
