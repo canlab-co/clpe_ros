@@ -119,7 +119,7 @@ int main(int argc, char ** argv)
   rclcpp::init(argc, argv);
 
   node = std::make_shared<ClpeNode<ClpeClientApi>>(ClpeClientApi());
-  image_transport::ImageTransport image_transport(node);
+  image_transport::ImageTransport transport(node);
 
   // declare ROS params
   {
@@ -136,7 +136,8 @@ int main(int argc, char ** argv)
   // create camera publishers
   camera_pubs.reserve(4);
   for (int i = 0; i < 4; ++i) {
-    camera_pubs[i] = image_transport.advertiseCamera("cam_" + std::to_string(i), 10);
+    camera_pubs.emplace_back(
+        transport.advertiseCamera("cam_" + std::to_string(i) + "/image_raw", 10));
   }
 
   // listen for param updates
