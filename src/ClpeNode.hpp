@@ -37,11 +37,11 @@ public:
     // Initialize ClpeClient
     {
       // FIXME: This requires sudo password!!
-      const auto result = this->clpe_api.Clpe_Connection("");
+      const auto result = this->clpe_api.Clpe_Connection("dev");
       if (result != 0) {
         RCLCPP_FATAL(this->get_logger(),
-                     "Failed to initiate the clpe network connection. Error number = ( ", result,
-                     " )");
+                     "Failed to initiate the clpe network connection. Error number = (" +
+                         std::to_string(result) + ")");
         exit(result);
       } else {
         RCLCPP_INFO(this->get_logger(), "Successfully initialized");
@@ -49,30 +49,34 @@ public:
     }
   }
 
-  sensor_msgs::msg::CameraInfo GetCameraInfo(int cam_id)
+  int GetCameraInfo(int cam_id, sensor_msgs::msg::CameraInfo & cam_info)
   {
+    // reset to defaults
+    cam_info = sensor_msgs::msg::CameraInfo();
     // calibration may change anytime for self calibrating systems, so we cannot cache the cam info.
-    sensor_msgs::msg::CameraInfo cam_info;
     cam_info.width = 1920;
     cam_info.height = 1080;
     EepromData eeprom_data;
     const auto result =
         this->clpe_api.Clpe_GetEepromData(cam_id, reinterpret_cast<unsigned char *>(&eeprom_data));
     if (result != 0) {
-      RCLCPP_FATAL(this->get_logger(),
-                   "Failed to get eeprom data ( " + std::to_string(result) + " )");
-      exit(result);
+      RCLCPP_ERROR(this->get_logger(),
+                   "Failed to get eeprom data (" + std::to_string(result) + ")");
+      return result;
     }
     cam_info.k = {eeprom_data.fx, 0, eeprom_data.cx, 0, eeprom_data.fy, eeprom_data.cy, 0, 0, 1};
     // TODO: is this calibration model in eeprom? It only supports "Jhang" and "FishEye" neither
     // of which is supported by ROS.
     // cam_info.distortion_model
-    return cam_info;
+    return result;
   }
 
-  static sensor_msgs::msg::Image CreateImageMsg(unsigned char * buffer, unsigned int size)
+  static void FillImageMsg(unsigned char * buffer, unsigned int size, const timeval & timestamp,
+                           sensor_msgs::msg::Image & image)
   {
-    sensor_msgs::msg::Image image;
+    image.header.frame_id = "base_link";
+    image.header.stamp.sec = timestamp.tv_sec;
+    image.header.stamp.nanosec = timestamp.tv_usec * 1000;
     // TODO: confirm that the buffer is valid for duration of the publish
     image.data = std::vector<unsigned char>(buffer, buffer + size);
     image.encoding = sensor_msgs::image_encodings::YUV422;
@@ -80,19 +84,19 @@ public:
     image.height = 1080;
     // assume that each row is same sized.
     image.step = size / 1080;
-    return image;
+    image.is_bigendian = false;
   }
 
-  sensor_msgs::msg::Image GetCameraImage(int cam_id)
+  int GetCameraImage(int cam_id, sensor_msgs::msg::Image & image)
   {
     unsigned char * buffer;
     unsigned int size;
     timeval timestamp;
     const auto result = this->clpe_api.Clpe_GetFrameOneCam(cam_id, &buffer, &size, &timestamp);
     if (result != 0) {
-      RCLCPP_WARN(this->get_logger(),
-                  "Failed to get camera frame ( " + std::to_string(result) + " )");
+      return result;
     }
-    return this->CreateImageMsg(buffer, size);
+    this->FillImageMsg(buffer, size, timestamp, image);
+    return result;
   }
 };
