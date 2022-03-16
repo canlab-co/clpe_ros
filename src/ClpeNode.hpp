@@ -2,11 +2,16 @@
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <sensor_msgs/msg/image.hpp>
 
+enum class ClpeCalibrationModel : uint32_t {
+  Jhang = 0,
+  FishEye = 1,
+};
+
 // TODO: docs say 95 bytes, but reference sheet is 107 bytes
 struct __attribute__((packed)) EepromData {
   uint16_t signature_code;
   uint64_t version;
-  uint32_t calibration_model;
+  ClpeCalibrationModel calibration_model;
   float fx;
   float fy;
   float cx;
@@ -64,7 +69,17 @@ public:
                    "Failed to get eeprom data (" + std::to_string(result) + ")");
       return result;
     }
+    switch (eeprom_data.calibration_model) {
+      case ClpeCalibrationModel::Jhang:
+        cam_info.distortion_model = sensor_msgs::distortion_models::PLUMB_BOB;
+        break;
+      case ClpeCalibrationModel::FishEye:
+        cam_info.distortion_model = sensor_msgs::distortion_models::EQUIDISTANT;
+        break;
+    }
     cam_info.k = {eeprom_data.fx, 0, eeprom_data.cx, 0, eeprom_data.fy, eeprom_data.cy, 0, 0, 1};
+    cam_info.d = {eeprom_data.k1, eeprom_data.k2, eeprom_data.p1,
+                  eeprom_data.p2, eeprom_data.k3, eeprom_data.k4};
     // TODO: is this calibration model in eeprom? It only supports "Jhang" and "FishEye" neither
     // of which is supported by ROS.
     // cam_info.distortion_model
