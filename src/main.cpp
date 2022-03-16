@@ -1,9 +1,11 @@
 #include <ClpeClientApi.h>
 
+#include <geometry_msgs/msg/transform.hpp>
 #include <image_transport/image_transport.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/distortion_models.hpp>
 #include <sensor_msgs/image_encodings.hpp>
+#include <tf2/LinearMath/Quaternion.h>
 
 #include "ClpeNode.hpp"
 
@@ -59,6 +61,32 @@ int main(int argc, char ** argv)
     range.step = 1;
     node->declare_parameter("fps", rclcpp::ParameterValue(30), desc);
   }
+  {
+    rcl_interfaces::msg::ParameterDescriptor desc;
+    desc.description =
+        "Pose relative to the base, 6 values corresponding to [x, y, z, roll, pitch, yaw]";
+    node->declare_parameter("pose",
+                            rclcpp::ParameterValue(std::vector<double>({0, 0, 0, 0, 0, 0})));
+  }
+
+  // publish tf
+  // use transient local with history depth 1 since the tf will never change.
+  rclcpp::QoS tf_qos(1);
+  tf_qos.reliable();
+  tf_qos.transient_local();
+  const auto tf_pub = node->create_publisher<geometry_msgs::msg::Transform>("tf", tf_qos);
+  geometry_msgs::msg::Transform tf_msg;
+  const auto & pose = node->get_parameter("pose").get_value<std::vector<double>>();
+  tf_msg.translation.x = pose[0];
+  tf_msg.translation.y = pose[1];
+  tf_msg.translation.z = pose[2];
+  tf2::Quaternion quat;
+  quat.setRPY(pose[3], pose[4], pose[5]);
+  tf_msg.rotation.x = quat.x();
+  tf_msg.rotation.y = quat.y();
+  tf_msg.rotation.z = quat.z();
+  tf_msg.rotation.w = quat.w();
+  tf_pub->publish(tf_msg);
 
   // create camera publishers
   camera_pubs.reserve(4);
