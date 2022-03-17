@@ -135,7 +135,7 @@ int main(int argc, char ** argv)
   // start publishing
   {
     RCLCPP_INFO(node->get_logger(), "Preparing camera for streaming");
-    const clpe::StartStreamError error = node->clpe_api.Clpe_StartStream(
+    const auto result = node->clpe_api.Clpe_StartStream(
         [](unsigned int inst, unsigned char * buffer, unsigned int size,
            struct timeval * frame_us) -> int {
           // FIXME: Stream api is not working
@@ -148,9 +148,10 @@ int main(int argc, char ** argv)
           return 0;
         },
         1, 1, 1, 1, 0);
-    if (error) {
+    if (result != 0) {
+      const std::error_code error(result, clpe::StartStreamError::get());
       RCLCPP_FATAL(node->get_logger(), "Failed to start streaming (" + error.message() + ")");
-      exit(error.value());
+      exit(result);
     }
   }
   // FIXME: use polling api since stream api is not working

@@ -9,6 +9,7 @@ pkg_search_module(gstreamer_app gstreamer-app-1.0 REQUIRED)
 
 add_executable(${PROJECT_NAME}
   src/main.cpp
+  src/asd.cpp
 )
 target_include_directories(${PROJECT_NAME} PRIVATE
   libclpe/include

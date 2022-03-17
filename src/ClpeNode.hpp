@@ -1,3 +1,5 @@
+#pragma once
+
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <sensor_msgs/msg/image.hpp>
@@ -63,8 +65,11 @@ public:
   {
     // FIXME: This requires sudo password!!
     const auto & password = this->get_parameter("password").get_value<std::string>();
-    const ConnectionError error = this->clpe_api.Clpe_Connection(password);
-    return error;
+    const auto result = this->clpe_api.Clpe_Connection(password);
+    if (result != 0) {
+      return std::error_code(result, ConnectionError::get());
+    }
+    return kNoError;
   }
 
   /**
@@ -78,10 +83,10 @@ public:
     cam_info.width = 1920;
     cam_info.height = 1080;
     EepromData eeprom_data;
-    const GetFrameError error =
+    const auto result =
         this->clpe_api.Clpe_GetEepromData(cam_id, reinterpret_cast<unsigned char *>(&eeprom_data));
-    if (error) {
-      return error;
+    if (result != 0) {
+      return std::error_code(result, GetEepromDataError::get());
     }
     switch (eeprom_data.calibration_model) {
       case CalibrationModel::Jhang:
@@ -94,7 +99,7 @@ public:
     cam_info.k = {eeprom_data.fx, 0, eeprom_data.cx, 0, eeprom_data.fy, eeprom_data.cy, 0, 0, 1};
     cam_info.d = {eeprom_data.k1, eeprom_data.k2, eeprom_data.p1,
                   eeprom_data.p2, eeprom_data.k3, eeprom_data.k4};
-    return error;
+    return kNoError;
   }
 
   static void FillImageMsg(unsigned char * buffer, unsigned int size, const timeval & timestamp,
@@ -118,13 +123,12 @@ public:
     unsigned char * buffer;
     unsigned int size;
     timeval timestamp;
-    const GetFrameError error =
-        this->clpe_api.Clpe_GetFrameOneCam(cam_id, &buffer, &size, &timestamp);
-    if (error) {
-      return error;
+    const auto result = this->clpe_api.Clpe_GetFrameOneCam(cam_id, &buffer, &size, &timestamp);
+    if (result != 0) {
+      return std::error_code(result, GetFrameError::get());
     }
     this->FillImageMsg(buffer, size, timestamp, image);
-    return error;
+    return kNoError;
   }
 };
 }  // namespace clpe
