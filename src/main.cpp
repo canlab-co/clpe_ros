@@ -1,11 +1,11 @@
 #include <ClpeClientApi.h>
+#include <tf2/LinearMath/Quaternion.h>
 
 #include <geometry_msgs/msg/transform.hpp>
 #include <image_transport/image_transport.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/distortion_models.hpp>
 #include <sensor_msgs/image_encodings.hpp>
-#include <tf2/LinearMath/Quaternion.h>
 
 #include "ClpeNode.hpp"
 
@@ -37,6 +37,36 @@ rclcpp::TimerBase::SharedPtr PollPublish(int fps)
       camera_pubs[i].publish(image, cam_infos[i]);
     }
   });
+}
+
+geometry_msgs::msg::Transform CreateTfMsg(double x, double y, double z, double roll, double pitch,
+                                          double yaw)
+{
+  geometry_msgs::msg::Transform tf_msg;
+  tf_msg.translation.x = x;
+  tf_msg.translation.y = y;
+  tf_msg.translation.z = z;
+  tf2::Quaternion quat;
+  quat.setRPY(roll, pitch, yaw);
+  tf_msg.rotation.x = quat.x();
+  tf_msg.rotation.y = quat.y();
+  tf_msg.rotation.z = quat.z();
+  tf_msg.rotation.w = quat.w();
+  return tf_msg;
+}
+
+/**
+ * Gets and validate the pose param.
+ * Exits the program with -1 if the param is invalid.
+ */
+std::vector<double> GetPoseParam()
+{
+  auto pose = node->get_parameter("pose").get_value<std::vector<double>>();
+  if (pose.size() != 6) {
+    RCLCPP_FATAL(node->get_logger(), "Failed to get pose parameter, wrong number of elements");
+    exit(-1);
+  }
+  return pose;
 }
 
 int main(int argc, char ** argv)
@@ -72,17 +102,8 @@ int main(int argc, char ** argv)
   tf_qos.transient_local();
   const auto tf_pub = node->create_publisher<geometry_msgs::msg::Transform>("tf", tf_qos);
   geometry_msgs::msg::Transform tf_msg;
-  const auto & pose = node->get_parameter("pose").get_value<std::vector<double>>();
-  tf_msg.translation.x = pose[0];
-  tf_msg.translation.y = pose[1];
-  tf_msg.translation.z = pose[2];
-  tf2::Quaternion quat;
-  quat.setRPY(pose[3], pose[4], pose[5]);
-  tf_msg.rotation.x = quat.x();
-  tf_msg.rotation.y = quat.y();
-  tf_msg.rotation.z = quat.z();
-  tf_msg.rotation.w = quat.w();
-  tf_pub->publish(tf_msg);
+  auto pose = GetPoseParam();
+  tf_pub->publish(CreateTfMsg(pose[0], pose[1], pose[2], pose[3], pose[4], pose[5]));
 
   // reading eeprom is slow so the camera info is stored and reused.
   RCLCPP_INFO(node->get_logger(), "Discovering camera properties");
@@ -136,6 +157,9 @@ int main(int argc, char ** argv)
             // TODO: header is missing Clpe_SetCamFPS in the docs?
             pub_timer.reset();
             pub_timer = PollPublish(fps);
+          } else if (p.get_name() == "pose") {
+            auto pose = GetPoseParam();
+            tf_pub->publish(CreateTfMsg(pose[0], pose[1], pose[2], pose[3], pose[4], pose[5]));
           }
         }
         rcl_interfaces::msg::SetParametersResult result;
