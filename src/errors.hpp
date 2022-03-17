@@ -1,4 +1,3 @@
-#include <exception>
 #include <system_error>
 
 namespace clpe
