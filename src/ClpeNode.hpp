@@ -37,12 +37,22 @@ class ClpeNode : public rclcpp::Node
 public:
   ClpeClientApi clpe_api;
 
-  ClpeNode(ClpeClientApi && clpe_api) : rclcpp::Node("clpe"), clpe_api(std::move(clpe_api))
+  ClpeNode(ClpeClientApi && clpe_api)
+      : rclcpp::Node("clpe"), clpe_api(std::move(clpe_api))
   {
+    // declare ros params
+    {
+      rcl_interfaces::msg::ParameterDescriptor desc;
+      desc.description = "sudo password";
+      desc.read_only = true;
+      this->declare_parameter("password", rclcpp::ParameterValue(), desc);
+    }
+
     // Initialize ClpeClient
     {
       // FIXME: This requires sudo password!!
-      const auto result = this->clpe_api.Clpe_Connection("dev");
+      const auto& password = this->get_parameter("password").get_value<std::string>();
+      const auto result = this->clpe_api.Clpe_Connection(password);
       if (result != 0) {
         RCLCPP_FATAL(this->get_logger(),
                      "Failed to initiate the clpe network connection. Error number = (" +
