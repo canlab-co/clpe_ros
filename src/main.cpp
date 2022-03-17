@@ -10,7 +10,7 @@
 #include "ClpeNode.hpp"
 
 // needed because clpe callback does not support user data :(.
-static std::shared_ptr<ClpeNode<ClpeClientApi>> node;
+static std::shared_ptr<clpe::ClpeNode<ClpeClientApi>> node;
 static std::vector<image_transport::CameraPublisher> camera_pubs;
 static std::array<sensor_msgs::msg::CameraInfo, 4> cam_infos;
 
@@ -24,15 +24,15 @@ rclcpp::TimerBase::SharedPtr PollPublish(int fps)
     RCLCPP_DEBUG(node->get_logger(), "publishing images");
     for (int i = 0; i < 4; ++i) {
       sensor_msgs::msg::Image image;
-      int result = node->GetCameraImage(i, image);
-      if (result == -2) {
+      const auto error = node->GetCameraImage(i, image);
+      if (error.value() == clpe::GetFrameError::FrameNotReady) {
         // no new frame
         RCLCPP_WARN(node->get_logger(),
                     "cam_" + std::to_string(i) + " missed frame update (no new frame available)");
         continue;
-      } else if (result != 0) {
-        RCLCPP_FATAL(node->get_logger(), "Error getting frame (" + std::to_string(result) + ")");
-        exit(result);
+      } else if (error) {
+        RCLCPP_FATAL(node->get_logger(), "Error getting frame (" + error.message() + ")");
+        exit(error.value());
       }
       camera_pubs[i].publish(image, cam_infos[i]);
     }
@@ -73,7 +73,16 @@ int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
 
-  node = std::make_shared<ClpeNode<ClpeClientApi>>(ClpeClientApi());
+  node = std::make_shared<clpe::ClpeNode<ClpeClientApi>>(ClpeClientApi());
+  {
+    const auto error = node->Init();
+    if (error) {
+      RCLCPP_FATAL(node->get_logger(),
+                   "Failed to initiate the clpe network connection (" + error.message() + ")");
+      exit(error.value());
+    }
+    RCLCPP_INFO(node->get_logger(), "Successfully initialized");
+  }
   image_transport::ImageTransport transport(node);
 
   // declare ROS params
@@ -108,10 +117,10 @@ int main(int argc, char ** argv)
   // reading eeprom is slow so the camera info is stored and reused.
   RCLCPP_INFO(node->get_logger(), "Discovering camera properties");
   for (int i = 0; i < 4; ++i) {
-    const auto result = node->GetCameraInfo(i, cam_infos[i]);
-    if (result != 0) {
-      RCLCPP_FATAL(node->get_logger(), "Failed to get camera info");
-      exit(result);
+    const auto error = node->GetCameraInfo(i, cam_infos[i]);
+    if (error) {
+      RCLCPP_FATAL(node->get_logger(), "Failed to get camera info (" + error.message() + ")");
+      exit(error.value());
     }
   }
   RCLCPP_INFO(node->get_logger(), "Successfully discovered camera properties");
@@ -124,23 +133,25 @@ int main(int argc, char ** argv)
   }
 
   // start publishing
-  RCLCPP_INFO(node->get_logger(), "Preparing camera for streaming");
-  const auto result = node->clpe_api.Clpe_StartStream(
-      [](unsigned int inst, unsigned char * buffer, unsigned int size,
-         struct timeval * frame_us) -> int {
-        // FIXME: Stream api is not working
-        // RCLCPP_DEBUG(node->get_logger(), "got new image for cam_" + std::to_string(inst));
-        // sensor_msgs::msg::Image image;
-        // node->FillImageMsg(buffer, size, *frame_us, image);
-        // sensor_msgs::msg::CameraInfo cam_info;
-        // // publishing is threadsafe in ROS
-        // camera_pubs[inst].publish(image, cam_infos[inst]);
-        return 0;
-      },
-      1, 1, 1, 1, 0);
-  if (result != 0) {
-    RCLCPP_FATAL(node->get_logger(), "Failed to start streaming (" + std::to_string(result) + ")");
-    exit(result);
+  {
+    RCLCPP_INFO(node->get_logger(), "Preparing camera for streaming");
+    const clpe::StartStreamError error = node->clpe_api.Clpe_StartStream(
+        [](unsigned int inst, unsigned char * buffer, unsigned int size,
+           struct timeval * frame_us) -> int {
+          // FIXME: Stream api is not working
+          // RCLCPP_DEBUG(node->get_logger(), "got new image for cam_" + std::to_string(inst));
+          // sensor_msgs::msg::Image image;
+          // node->FillImageMsg(buffer, size, *frame_us, image);
+          // sensor_msgs::msg::CameraInfo cam_info;
+          // // publishing is threadsafe in ROS
+          // camera_pubs[inst].publish(image, cam_infos[inst]);
+          return 0;
+        },
+        1, 1, 1, 1, 0);
+    if (error) {
+      RCLCPP_FATAL(node->get_logger(), "Failed to start streaming (" + error.message() + ")");
+      exit(error.value());
+    }
   }
   // FIXME: use polling api since stream api is not working
   rclcpp::TimerBase::SharedPtr pub_timer;

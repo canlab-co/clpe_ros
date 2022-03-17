@@ -2,7 +2,11 @@
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <sensor_msgs/msg/image.hpp>
 
-enum class ClpeCalibrationModel : uint32_t {
+#include "errors.hpp"
+
+namespace clpe
+{
+enum class CalibrationModel : uint32_t {
   Jhang = 0,
   FishEye = 1,
 };
@@ -11,7 +15,7 @@ enum class ClpeCalibrationModel : uint32_t {
 struct __attribute__((packed)) EepromData {
   uint16_t signature_code;
   uint64_t version;
-  ClpeCalibrationModel calibration_model;
+  CalibrationModel calibration_model;
   float fx;
   float fy;
   float cx;
@@ -37,8 +41,7 @@ class ClpeNode : public rclcpp::Node
 public:
   ClpeClientApi clpe_api;
 
-  ClpeNode(ClpeClientApi && clpe_api)
-      : rclcpp::Node("clpe"), clpe_api(std::move(clpe_api))
+  ClpeNode(ClpeClientApi && clpe_api) : rclcpp::Node("clpe"), clpe_api(std::move(clpe_api))
   {
     // declare ros params
     {
@@ -48,26 +51,26 @@ public:
       this->declare_parameter("password", rclcpp::ParameterValue(), desc);
     }
 
-    // Initialize ClpeClient
+    //
     {
-      // FIXME: This requires sudo password!!
-      const auto& password = this->get_parameter("password").get_value<std::string>();
-      const auto result = this->clpe_api.Clpe_Connection(password);
-      if (result != 0) {
-        RCLCPP_FATAL(this->get_logger(),
-                     "Failed to initiate the clpe network connection. Error number = (" +
-                         std::to_string(result) + ")");
-        exit(result);
-      } else {
-        RCLCPP_INFO(this->get_logger(), "Successfully initialized");
-      }
     }
+  }
+
+  /**
+   * Initialize ClpeClient
+   */
+  std::error_code Init()
+  {
+    // FIXME: This requires sudo password!!
+    const auto & password = this->get_parameter("password").get_value<std::string>();
+    const ConnectionError error = this->clpe_api.Clpe_Connection(password);
+    return error;
   }
 
   /**
    * Reading the camera's eeprom is slow so callers should cache the result
    */
-  int GetCameraInfo(int cam_id, sensor_msgs::msg::CameraInfo & cam_info)
+  std::error_code GetCameraInfo(int cam_id, sensor_msgs::msg::CameraInfo & cam_info)
   {
     // reset to defaults
     cam_info = sensor_msgs::msg::CameraInfo();
@@ -75,25 +78,23 @@ public:
     cam_info.width = 1920;
     cam_info.height = 1080;
     EepromData eeprom_data;
-    const auto result =
+    const GetFrameError error =
         this->clpe_api.Clpe_GetEepromData(cam_id, reinterpret_cast<unsigned char *>(&eeprom_data));
-    if (result != 0) {
-      RCLCPP_ERROR(this->get_logger(),
-                   "Failed to get eeprom data (" + std::to_string(result) + ")");
-      return result;
+    if (error) {
+      return error;
     }
     switch (eeprom_data.calibration_model) {
-      case ClpeCalibrationModel::Jhang:
+      case CalibrationModel::Jhang:
         cam_info.distortion_model = sensor_msgs::distortion_models::PLUMB_BOB;
         break;
-      case ClpeCalibrationModel::FishEye:
+      case CalibrationModel::FishEye:
         cam_info.distortion_model = sensor_msgs::distortion_models::EQUIDISTANT;
         break;
     }
     cam_info.k = {eeprom_data.fx, 0, eeprom_data.cx, 0, eeprom_data.fy, eeprom_data.cy, 0, 0, 1};
     cam_info.d = {eeprom_data.k1, eeprom_data.k2, eeprom_data.p1,
                   eeprom_data.p2, eeprom_data.k3, eeprom_data.k4};
-    return result;
+    return error;
   }
 
   static void FillImageMsg(unsigned char * buffer, unsigned int size, const timeval & timestamp,
@@ -112,16 +113,18 @@ public:
     image.is_bigendian = false;
   }
 
-  int GetCameraImage(int cam_id, sensor_msgs::msg::Image & image)
+  std::error_code GetCameraImage(int cam_id, sensor_msgs::msg::Image & image)
   {
     unsigned char * buffer;
     unsigned int size;
     timeval timestamp;
-    const auto result = this->clpe_api.Clpe_GetFrameOneCam(cam_id, &buffer, &size, &timestamp);
-    if (result != 0) {
-      return result;
+    const GetFrameError error =
+        this->clpe_api.Clpe_GetFrameOneCam(cam_id, &buffer, &size, &timestamp);
+    if (error) {
+      return error;
     }
     this->FillImageMsg(buffer, size, timestamp, image);
-    return result;
+    return error;
   }
 };
+}  // namespace clpe
