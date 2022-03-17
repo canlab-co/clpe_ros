@@ -12,6 +12,7 @@
 // needed because clpe callback does not support user data :(.
 static std::shared_ptr<ClpeNode<ClpeClientApi>> node;
 static std::vector<image_transport::CameraPublisher> camera_pubs;
+static std::array<sensor_msgs::msg::CameraInfo, 4> cam_infos;
 
 /**
  * Publishes camera images by polling with a fixed interval. There is no synchronization
@@ -33,12 +34,7 @@ rclcpp::TimerBase::SharedPtr PollPublish(int fps)
         RCLCPP_FATAL(node->get_logger(), "Error getting frame (" + std::to_string(result) + ")");
         exit(result);
       }
-      sensor_msgs::msg::CameraInfo cam_info;
-      result = node->GetCameraInfo(i, cam_info);
-      if (result != 0) {
-        exit(result);
-      }
-      camera_pubs[i].publish(image, cam_info);
+      camera_pubs[i].publish(image, cam_infos[i]);
     }
   });
 }
@@ -88,6 +84,17 @@ int main(int argc, char ** argv)
   tf_msg.rotation.w = quat.w();
   tf_pub->publish(tf_msg);
 
+  // reading eeprom is slow so the camera info is stored and reused.
+  RCLCPP_INFO(node->get_logger(), "Discovering camera properties");
+  for (int i = 0; i < 4; ++i) {
+    const auto result = node->GetCameraInfo(i, cam_infos[i]);
+    if (result != 0) {
+      RCLCPP_FATAL(node->get_logger(), "Failed to get camera info");
+      exit(result);
+    }
+  }
+  RCLCPP_INFO(node->get_logger(), "Successfully discovered camera properties");
+
   // create camera publishers
   camera_pubs.reserve(4);
   for (int i = 0; i < 4; ++i) {
@@ -96,6 +103,7 @@ int main(int argc, char ** argv)
   }
 
   // start publishing
+  RCLCPP_INFO(node->get_logger(), "Preparing camera for streaming");
   const auto result = node->clpe_api.Clpe_StartStream(
       [](unsigned int inst, unsigned char * buffer, unsigned int size,
          struct timeval * frame_us) -> int {
@@ -104,23 +112,20 @@ int main(int argc, char ** argv)
         // sensor_msgs::msg::Image image;
         // node->FillImageMsg(buffer, size, *frame_us, image);
         // sensor_msgs::msg::CameraInfo cam_info;
-        // const auto result = node->GetCameraInfo(inst, cam_info);
-        // if (result != 0) {
-        //   exit(result);
-        // }
         // // publishing is threadsafe in ROS
-        // camera_pubs[inst].publish(image, cam_info);
+        // camera_pubs[inst].publish(image, cam_infos[inst]);
         return 0;
       },
       1, 1, 1, 1, 0);
   if (result != 0) {
-    RCLCPP_FATAL(node->get_logger(), "Failed to start streaming");
+    RCLCPP_FATAL(node->get_logger(), "Failed to start streaming (" + std::to_string(result) + ")");
     exit(result);
   }
   // FIXME: use polling api since stream api is not working
   rclcpp::TimerBase::SharedPtr pub_timer;
   auto fps = node->get_parameter("fps").get_value<int>();
   pub_timer = PollPublish(fps);
+  RCLCPP_INFO(node->get_logger(), "Started publishing camera images");
 
   // listen for param updates
   const auto onSetParamCbHdl =
