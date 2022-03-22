@@ -108,8 +108,10 @@ public:
     image.header.frame_id = "base_link";
     image.header.stamp.sec = timestamp.tv_sec;
     image.header.stamp.nanosec = timestamp.tv_usec * 1000;
-    // TODO: confirm that the buffer is valid for duration of the publish
-    image.data = std::vector<unsigned char>(buffer, buffer + size);
+    // buffer is only valid for 16 frames, since ros2 publish has no real time guarantees, we must
+    // copy the data out to avoid UB.
+    image.data.reserve(size);
+    std::copy(buffer, buffer + size, image.data.data());
     image.encoding = sensor_msgs::image_encodings::YUV422;
     image.width = 1920;
     image.height = 1080;
