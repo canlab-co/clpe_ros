@@ -14,31 +14,6 @@ static std::shared_ptr<clpe::ClpeNode<ClpeClientApi>> node;
 static std::vector<image_transport::CameraPublisher> camera_pubs;
 static std::array<sensor_msgs::msg::CameraInfo, 4> cam_infos;
 
-/**
- * Publishes camera images by polling with a fixed interval. There is no synchronization
- * so an image may be published multiple times.
- */
-rclcpp::TimerBase::SharedPtr PollPublish(int fps)
-{
-  return node->create_wall_timer(std::chrono::duration<double>(1.0 / fps), []() {
-    RCLCPP_DEBUG(node->get_logger(), "publishing images");
-    for (int i = 0; i < 4; ++i) {
-      sensor_msgs::msg::Image image;
-      const auto error = node->GetCameraImage(i, image);
-      if (error.value() == clpe::GetFrameError::FrameNotReady) {
-        // no new frame
-        RCLCPP_WARN(node->get_logger(),
-                    "cam_" + std::to_string(i) + " missed frame update (no new frame available)");
-        continue;
-      } else if (error) {
-        RCLCPP_FATAL(node->get_logger(), "Error getting frame (" + error.message() + ")");
-        exit(error.value());
-      }
-      camera_pubs[i].publish(image, cam_infos[i]);
-    }
-  });
-}
-
 geometry_msgs::msg::Transform CreateTfMsg(double x, double y, double z, double roll, double pitch,
                                           double yaw)
 {
@@ -88,16 +63,6 @@ int main(int argc, char ** argv)
   // declare ROS params
   {
     rcl_interfaces::msg::ParameterDescriptor desc;
-    desc.description = "Frames per second, must be >=15,<=30";
-    desc.integer_range.emplace_back();
-    auto & range = desc.integer_range.back();
-    range.from_value = 15;
-    range.to_value = 30;
-    range.step = 1;
-    node->declare_parameter("fps", rclcpp::ParameterValue(30), desc);
-  }
-  {
-    rcl_interfaces::msg::ParameterDescriptor desc;
     desc.description =
         "Pose relative to the base, 6 values corresponding to [x, y, z, roll, pitch, yaw]";
     node->declare_parameter("pose",
@@ -138,13 +103,10 @@ int main(int argc, char ** argv)
     const auto result = node->clpe_api.Clpe_StartStream(
         [](unsigned int inst, unsigned char * buffer, unsigned int size,
            struct timeval * frame_us) -> int {
-          // FIXME: Stream api is not working
-          // RCLCPP_DEBUG(node->get_logger(), "got new image for cam_" + std::to_string(inst));
-          // sensor_msgs::msg::Image image;
-          // node->FillImageMsg(buffer, size, *frame_us, image);
-          // sensor_msgs::msg::CameraInfo cam_info;
-          // // publishing is threadsafe in ROS
-          // camera_pubs[inst].publish(image, cam_infos[inst]);
+          RCLCPP_DEBUG(node->get_logger(), "got new image for cam_" + std::to_string(inst));
+          sensor_msgs::msg::Image image;
+          node->FillImageMsg(buffer, size, *frame_us, image);
+          camera_pubs[inst].publish(image, cam_infos[inst]);
           return 0;
         },
         1, 1, 1, 1, 0);
@@ -153,23 +115,14 @@ int main(int argc, char ** argv)
       RCLCPP_FATAL(node->get_logger(), "Failed to start streaming (" + error.message() + ")");
       exit(result);
     }
+    RCLCPP_INFO(node->get_logger(), "Start streaming images");
   }
-  // FIXME: use polling api since stream api is not working
-  rclcpp::TimerBase::SharedPtr pub_timer;
-  auto fps = node->get_parameter("fps").get_value<int>();
-  pub_timer = PollPublish(fps);
-  RCLCPP_INFO(node->get_logger(), "Started publishing camera images");
 
   // listen for param updates
   const auto onSetParamCbHdl =
       node->add_on_set_parameters_callback([&](const std::vector<rclcpp::Parameter> & params) {
         for (const auto & p : params) {
-          if (p.get_name() == "fps") {
-            const auto fps = p.get_value<int>();
-            // TODO: header is missing Clpe_SetCamFPS in the docs?
-            pub_timer.reset();
-            pub_timer = PollPublish(fps);
-          } else if (p.get_name() == "pose") {
+          if (p.get_name() == "pose") {
             auto pose = GetPoseParam();
             tf_pub->publish(CreateTfMsg(pose[0], pose[1], pose[2], pose[3], pose[4], pose[5]));
           }

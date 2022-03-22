@@ -52,10 +52,6 @@ public:
       desc.read_only = true;
       this->declare_parameter("password", rclcpp::ParameterValue(), desc);
     }
-
-    //
-    {
-    }
   }
 
   /**
