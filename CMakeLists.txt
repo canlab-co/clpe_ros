@@ -4,6 +4,7 @@ project(canlab_ros)
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(image_transport REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_search_module(gstreamer_app gstreamer-app-1.0 REQUIRED)
 
@@ -23,5 +24,10 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_14)
 
 install(TARGETS ${PROJECT_NAME})
+
+option(CANLAB_ROS_BUILD_BENCHMARKS "build benchmarks")
+if (${CANLAB_ROS_BUILD_BENCHMARKS})
+  add_subdirectory(benchmarks)
+endif()
 
 ament_package()
