@@ -1,7 +1,12 @@
 #pragma once
 
+#include <tf2/LinearMath/Quaternion.h>
+
+#include <geometry_msgs/msg/transform.hpp>
 #include <image_transport/image_transport.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/distortion_models.hpp>
+#include <sensor_msgs/image_encodings.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <sensor_msgs/msg/image.hpp>
 
@@ -148,7 +153,7 @@ public:
 private:
   std::unique_ptr<image_transport::ImageTransport> transport_;
 
-  ClpeNode(ClpeClientApi && clpe_api) : rclcpp::Node("clpe"), clpe_api(std::move(clpe_api))
+  explicit ClpeNode(ClpeClientApi && clpe_api) : rclcpp::Node("clpe"), clpe_api(std::move(clpe_api))
   {
     // declare ros params
     {
@@ -252,5 +257,7 @@ private:
     this->FillImageMsg_(buffer, size, timestamp, image);
     return kNoError;
   }
+
+  friend class ClpeComponentNode;
 };
 }  // namespace clpe
