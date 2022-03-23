@@ -19,6 +19,22 @@ enum class CalibrationModel : uint32_t {
   FishEye = 1,
 };
 
+static constexpr const char * kPassword = "password";
+static constexpr const char * kCamPose[] = {"cam_0_pose", "cam_1_pose", "cam_2_pose", "cam_3_pose"};
+static constexpr const char * kCamBaseFrame[] = {"cam_0_base_frame", "cam_1_base_frame",
+                                                 "cam_2_base_frame", "cam_3_base_frame"};
+static constexpr const char * kCamQos[] = {"cam_0_qos", "cam_1_qos", "cam_2_qos", "cam_3_qos"};
+static constexpr const char * kCamInfoQos[] = {"cam_0_info_qos", "cam_1_info_qos", "cam_2_info_qos",
+                                               "cam_3_info_qos"};
+static constexpr const char * kQosSystemDefault = "SYSTEM_DEFAULT";
+static constexpr const char * kQosParameterEvents = "PARAMETER_EVENTS";
+static constexpr const char * kQosServicesDefault = "SERVICES_DEFAULT";
+static constexpr const char * kQosParameters = "PARAMETERS";
+static constexpr const char * kQosDefault = "DEFAULT";
+static constexpr const char * kQosSensorData = "SENSOR_DATA";
+static constexpr const char * kQosHidDefault = "HID_DEFAULT";
+static constexpr const char * kQosExtrinsicsDefault = "EXTRINSICS_DEFAULT";
+
 // TODO: docs say 95 bytes, but reference sheet is 107 bytes
 struct __attribute__((packed)) EepromData {
   uint16_t signature_code;
@@ -76,7 +92,7 @@ public:
   void Init()
   {
     // FIXME: This requires sudo password!!
-    const auto & password = this->get_parameter("password").get_value<std::string>();
+    const auto & password = this->get_parameter(kPassword).get_value<std::string>();
     const auto result = this->clpe_api.Clpe_Connection(password);
     if (result != 0) {
       RCLCPP_FATAL(this->get_logger(), "Failed to initiate the clpe network connection (" +
@@ -89,10 +105,13 @@ public:
     rclcpp::QoS tf_qos(1);
     tf_qos.reliable();
     tf_qos.transient_local();
-    const auto tf_pub = this->create_publisher<geometry_msgs::msg::Transform>("tf", tf_qos);
-    geometry_msgs::msg::Transform tf_msg;
-    auto pose = this->GetPoseParam_();
-    tf_pub->publish(Me::CreateTfMsg_(pose[0], pose[1], pose[2], pose[3], pose[4], pose[5]));
+    for (int i = 0; i < 4; ++i) {
+      const auto tf_pub = this->create_publisher<geometry_msgs::msg::Transform>(
+          "cam_" + std::to_string(i) + "/tf", tf_qos);
+      geometry_msgs::msg::Transform tf_msg;
+      auto pose = this->GetPoseParam_(i);
+      tf_pub->publish(Me::CreateTfMsg_(pose[0], pose[1], pose[2], pose[3], pose[4], pose[5]));
+    }
 
     // reading eeprom is slow so the camera info is stored and reused.
     RCLCPP_INFO(this->get_logger(), "Discovering camera properties");
@@ -108,10 +127,12 @@ public:
     // create camera publishers
     kImagePubs.reserve(4);
     for (int i = 0; i < 4; ++i) {
-      kImagePubs.emplace_back(
-          this->transport_->advertise("cam_" + std::to_string(i) + "/image_raw", 10));
+      kImagePubs.emplace_back(image_transport::create_publisher(
+          this, "cam_" + std::to_string(i) + "/image_raw",
+          GetQos_(this->get_parameter(kCamQos[i]).get_value<std::string>()).get_rmw_qos_profile()));
       kInfoPubs[i] = this->create_publisher<sensor_msgs::msg::CameraInfo>(
-          "cam_" + std::to_string(i) + "/camera_info", 10);
+          "cam_" + std::to_string(i) + "/camera_info",
+          this->GetQos_(this->get_parameter(kCamInfoQos[i]).get_value<std::string>()));
     }
 
     // start publishing
@@ -145,23 +166,6 @@ public:
       }
       RCLCPP_INFO(this->get_logger(), "Start streaming images");
     }
-
-    // listen for param updates
-    {
-      const auto onSetParamCbHdl =
-          this->add_on_set_parameters_callback([&](const std::vector<rclcpp::Parameter> & params) {
-            for (const auto & p : params) {
-              if (p.get_name() == "pose") {
-                auto pose = this->GetPoseParam_();
-                tf_pub->publish(
-                    Me::CreateTfMsg_(pose[0], pose[1], pose[2], pose[3], pose[4], pose[5]));
-              }
-            }
-            rcl_interfaces::msg::SetParametersResult result;
-            result.successful = true;
-            return result;
-          });
-    }
   }
 
 private:
@@ -174,20 +178,42 @@ private:
       rcl_interfaces::msg::ParameterDescriptor desc;
       desc.description = "sudo password";
       desc.read_only = true;
-      this->declare_parameter("password", rclcpp::ParameterValue(), desc);
+      this->declare_parameter(kPassword, rclcpp::ParameterValue(), desc);
     }
-    {
-      rcl_interfaces::msg::ParameterDescriptor desc;
-      desc.description =
+    for (int i = 0; i < 4; ++i) {
+      rcl_interfaces::msg::ParameterDescriptor tf_desc;
+      tf_desc.description =
           "Pose relative to the base, 6 values corresponding to [x, y, z, roll, pitch, yaw]";
-      this->declare_parameter("pose",
-                              rclcpp::ParameterValue(std::vector<double>({0, 0, 0, 0, 0, 0})));
+      this->declare_parameter(kCamPose[i], std::vector<double>({0, 0, 0, 0, 0, 0}));
+
+      rcl_interfaces::msg::ParameterDescriptor base_frame_desc;
+      base_frame_desc.description = "Defines the frame_id all static transformations refers to";
+      base_frame_desc.read_only = true;
+      this->declare_parameter(kCamBaseFrame[i], "base_link");
+
+      rcl_interfaces::msg::ParameterDescriptor qos_desc;
+      qos_desc.description =
+          "Sets the QoS by which the topic is published. Available values are the following "
+          "strings: SYSTEM_DEFAULT, PARAMETER_EVENTS, SERVICES_DEFAULT, PARAMETERS, DEFAULT, "
+          "SENSOR_DATA, HID_DEFAULT (= DEFAULT with depth of 100), EXTRINSICS_DEFAULT (= DEFAULT "
+          "with depth of 1 and transient local durabilty). Default is SENSOR_DATA.";
+      qos_desc.read_only = true;
+      this->declare_parameter(kCamQos[i], "SENSOR_DATA");
+
+      rcl_interfaces::msg::ParameterDescriptor info_qos_desc;
+      info_qos_desc.description =
+          "Sets the QoS by which the info topic is published. Available values are the following "
+          "strings: SYSTEM_DEFAULT, PARAMETER_EVENTS, SERVICES_DEFAULT, PARAMETERS, DEFAULT, "
+          "SENSOR_DATA, HID_DEFAULT (= DEFAULT with depth of 100), EXTRINSICS_DEFAULT (= DEFAULT "
+          "with depth of 1 and transient local durabilty). Default is SYSTEM_DEFAULT.";
+      info_qos_desc.read_only = true;
+      this->declare_parameter(kCamInfoQos[i], "SYSTEM_DEFAULT");
     }
   }
 
-  std::vector<double> GetPoseParam_()
+  std::vector<double> GetPoseParam_(int cam_id)
   {
-    auto pose = this->get_parameter("pose").get_value<std::vector<double>>();
+    auto pose = this->get_parameter(kCamPose[cam_id]).get_value<std::vector<double>>();
     if (pose.size() != 6) {
       RCLCPP_FATAL(this->get_logger(), "Failed to get pose parameter, wrong number of elements");
       exit(-1);
@@ -270,6 +296,30 @@ private:
     }
     this->FillImageMsg_(buffer, size, timestamp, image);
     return kNoError;
+  }
+
+  static rclcpp::QoS GetQos_(const std::string & val)
+  {
+    if (val == kQosSystemDefault) {
+      return rclcpp::SystemDefaultsQoS();
+    } else if (val == kQosParameterEvents) {
+      return rclcpp::ParameterEventsQoS();
+    } else if (val == kQosServicesDefault) {
+      return rclcpp::ServicesQoS();
+    } else if (val == kQosParameters) {
+      return rclcpp::ParametersQoS();
+    } else if (val == kQosDefault) {
+      return rclcpp::QoS(10);
+    } else if (val == kQosSensorData) {
+      return rclcpp::SensorDataQoS();
+    } else if (val == kQosHidDefault) {
+      return rclcpp::QoS(100);
+    } else if (val == kQosExtrinsicsDefault) {
+      auto qos = rclcpp::QoS(1);
+      qos.transient_local();
+      return qos;
+    }
+    return rclcpp::SystemDefaultsQoS();
   }
 
   friend class ClpeComponentNode;
