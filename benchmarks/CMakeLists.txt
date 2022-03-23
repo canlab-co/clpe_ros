@@ -1,5 +1,6 @@
 add_executable(latency latency.cpp)
 target_include_directories(latency PRIVATE ${sensor_msgs_INCLUDE_DIRS})
 target_link_libraries(latency PRIVATE rclcpp::rclcpp ${sensor_msgs_LIBRARIES})
-# always enable optimization
-target_compile_options(latency PRIVATE -O3)
+# always build in release mode
+separate_arguments(BUILD_FLAGS NATIVE_COMMAND ${CMAKE_CXX_FLAGS_RELEASE})
+target_compile_options(latency PRIVATE ${BUILD_FLAGS})
