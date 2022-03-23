@@ -45,7 +45,8 @@ struct __attribute__((packed)) EepromData {
 
 // needed because clpe callback does not support user data :(.
 static rclcpp::Node::SharedPtr kNode;
-static std::vector<image_transport::CameraPublisher> kCameraPubs;
+static std::vector<image_transport::Publisher> kImagePubs;
+static std::array<rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr, 4> kInfoPubs;
 static std::array<sensor_msgs::msg::CameraInfo, 4> kCamInfos;
 
 template <typename ClpeClientApi>
@@ -105,10 +106,12 @@ public:
     RCLCPP_INFO(this->get_logger(), "Successfully discovered camera properties");
 
     // create camera publishers
-    kCameraPubs.reserve(4);
+    kImagePubs.reserve(4);
     for (int i = 0; i < 4; ++i) {
-      kCameraPubs.emplace_back(
-          this->transport_->advertiseCamera("cam_" + std::to_string(i) + "/image_raw", 10));
+      kImagePubs.emplace_back(
+          this->transport_->advertise("cam_" + std::to_string(i) + "/image_raw", 10));
+      kInfoPubs[i] = this->create_publisher<sensor_msgs::msg::CameraInfo>(
+          "cam_" + std::to_string(i) + "/camera_info", 10);
     }
 
     // start publishing
@@ -120,17 +123,18 @@ public:
             RCLCPP_DEBUG(kNode->get_logger(), "got new image for cam_" + std::to_string(cam_id));
 
             // skip all work if there is no subscribers
-            // TODO: Not supported by image_transport https://github.com/ros-perception/image_common/blob/88831efcb03114261d15ab36058aa90dd3efc123/image_transport/src/camera_publisher.cpp#L99-L105
-            // if (kCameraPubs[cam_id].getNumSubscribers() == 0) {
-            //   RCLCPP_DEBUG(kNode->get_logger(), "skipped publishing for cam_" +
-            //                                         std::to_string(cam_id) +
-            //                                         " because there are no subscribers");
-            //   return 0;
-            // }
+            if (kImagePubs[cam_id].getNumSubscribers() == 0 &&
+                kInfoPubs[cam_id]->get_subscription_count() == 0) {
+              RCLCPP_DEBUG(kNode->get_logger(), "skipped publishing for cam_" +
+                                                    std::to_string(cam_id) +
+                                                    " because there are no subscribers");
+              return 0;
+            }
 
             sensor_msgs::msg::Image image;
             Me::FillImageMsg_(buffer, size, *frame_us, image);
-            kCameraPubs[cam_id].publish(image, kCamInfos[cam_id]);
+            kImagePubs[cam_id].publish(image);
+            kInfoPubs[cam_id]->publish(kCamInfos[cam_id]);
             return 0;
           },
           1, 1, 1, 1, 0);
