@@ -22,7 +22,7 @@ target_compile_features(${PROJECT_NAME}_lib INTERFACE cxx_std_14)
 add_executable(${PROJECT_NAME}
   src/main.cpp)
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_lib)
-install(TARGETS ${PROJECT_NAME})
+install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION lib/${PROJECT_NAME})
 
 # TODO: This doesn't work because the clpe library is not position independent.
 # include(GenerateExportHeader)
