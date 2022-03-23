@@ -6,11 +6,23 @@
 
 namespace clpe
 {
-class ClpeComponentNode : public ClpeNode<ClpeClientApi>
+class ClpeComponentNode
 {
 public:
   CANLAB_ROS_COMPONENT_EXPORT
-  ClpeComponentNode(const rclcpp::NodeOptions & node) : ClpeNode<ClpeClientApi>(ClpeClientApi()) {}
+  ClpeComponentNode(const rclcpp::NodeOptions & node)
+  {
+    this->node_ = ClpeNode<ClpeClientApi>::make_shared(ClpeClientApi());
+  }
+
+  CANLAB_ROS_COMPONENT_EXPORT
+  rclcpp::node_interfaces::NodeBaseInterface::SharedPtr get_node_base_interface() const
+  {
+    return this->node_->get_node_base_interface();
+  }
+
+private:
+  std::shared_ptr<ClpeNode<ClpeClientApi>> node_;
 };
 }  // namespace clpe
 
