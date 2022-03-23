@@ -117,6 +117,11 @@ public:
       const auto result = this->clpe_api.Clpe_StartStream(
           [](unsigned int cam_id, unsigned char * buffer, unsigned int size,
              struct timeval * frame_us) -> int {
+            // skip all work if there is no subscribers
+            if (kCameraPubs[cam_id].getNumSubscribers() == 0) {
+              return 0;
+            }
+
             RCLCPP_DEBUG(kNode->get_logger(), "got new image for cam_" + std::to_string(cam_id));
             sensor_msgs::msg::Image image;
             Me::FillImageMsg_(buffer, size, *frame_us, image);
