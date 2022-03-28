@@ -9,7 +9,7 @@
   <license>Unspecified</license>
   <author>Teo Koon Peng</author>
 
-  <depend>rclcpp</depend>
+  <depend>roscpp</depend>
   <depend>image_transport</depend>
 
   <buildtool_depend>catkin</buildtool_depend>

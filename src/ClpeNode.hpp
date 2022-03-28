@@ -178,7 +178,7 @@ private:
   std::unique_ptr<image_transport::ImageTransport> transport_;
 
   explicit ClpeNode(ClpeClientApi && clpe_api)
-      : ros::NodeHandle("clpe"), clpe_api(std::move(clpe_api))
+      : ros::NodeHandle("~"), clpe_api(std::move(clpe_api))
   {
   }
 

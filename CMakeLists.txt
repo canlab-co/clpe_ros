@@ -8,6 +8,8 @@ find_package(sensor_msgs REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_search_module(gstreamer_app gstreamer-app-1.0 REQUIRED)
 
+catkin_package(DEPENDS roscpp image_transport)
+
 add_library(${PROJECT_NAME}_lib INTERFACE)
 target_include_directories(${PROJECT_NAME}_lib INTERFACE
   libclpe/include
@@ -52,5 +54,3 @@ option(CANLAB_ROS_BUILD_BENCHMARKS "build benchmarks")
 if (${CANLAB_ROS_BUILD_BENCHMARKS})
   add_subdirectory(benchmarks)
 endif()
-
-catkin_package()
