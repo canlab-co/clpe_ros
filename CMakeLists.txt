@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(canlab_ros)
 
-find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
+find_package(catkin REQUIRED)
+find_package(roscpp REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(PkgConfig REQUIRED)
@@ -11,10 +11,10 @@ pkg_search_module(gstreamer_app gstreamer-app-1.0 REQUIRED)
 add_library(${PROJECT_NAME}_lib INTERFACE)
 target_include_directories(${PROJECT_NAME}_lib INTERFACE
   libclpe/include
-  ${sensor_msgs_INCLUDE_DIRS})
+  ${roscpp_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME}_lib INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}/libclpe/lib/libclpe.a
-  rclcpp::rclcpp
+  ${roscpp_LIBRARIES}
   ${image_transport_LIBRARIES}
   ${gstreamer_app_LIBRARIES})
 target_compile_features(${PROJECT_NAME}_lib INTERFACE cxx_std_14)
@@ -53,4 +53,4 @@ if (${CANLAB_ROS_BUILD_BENCHMARKS})
   add_subdirectory(benchmarks)
 endif()
 
-ament_package()
+catkin_package()

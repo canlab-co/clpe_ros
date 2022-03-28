@@ -1,16 +1,16 @@
 #include <ClpeClientApi.h>
 
-#include <rclcpp/rclcpp.hpp>
+#include <ros/ros.h>
 
 #include "ClpeNode.hpp"
 
 int main(int argc, char ** argv)
 {
-  rclcpp::init(argc, argv);
+  ros::init(argc, argv, "clpe_node");
 
   const auto node = clpe::ClpeNode<ClpeClientApi>::make_shared(ClpeClientApi());
   node->Init();
-  rclcpp::spin(node);
+  ros::spin();
 
   return 0;
 }

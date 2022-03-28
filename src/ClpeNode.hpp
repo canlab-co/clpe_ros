@@ -1,14 +1,13 @@
 #pragma once
 
+#include <geometry_msgs/Transform.h>
+#include <image_transport/image_transport.h>
+#include <ros/ros.h>
+#include <sensor_msgs/CameraInfo.h>
+#include <sensor_msgs/Image.h>
+#include <sensor_msgs/distortion_models.h>
+#include <sensor_msgs/image_encodings.h>
 #include <tf2/LinearMath/Quaternion.h>
-
-#include <geometry_msgs/msg/transform.hpp>
-#include <image_transport/image_transport.hpp>
-#include <rclcpp/rclcpp.hpp>
-#include <sensor_msgs/distortion_models.hpp>
-#include <sensor_msgs/image_encodings.hpp>
-#include <sensor_msgs/msg/camera_info.hpp>
-#include <sensor_msgs/msg/image.hpp>
 
 #include "errors.hpp"
 
@@ -23,9 +22,15 @@ static constexpr const char * kPassword = "password";
 static constexpr const char * kCamPose[] = {"cam_0_pose", "cam_1_pose", "cam_2_pose", "cam_3_pose"};
 static constexpr const char * kCamBaseFrame[] = {"cam_0_base_frame", "cam_1_base_frame",
                                                  "cam_2_base_frame", "cam_3_base_frame"};
-static constexpr const char * kCamQos[] = {"cam_0_qos", "cam_1_qos", "cam_2_qos", "cam_3_qos"};
-static constexpr const char * kCamInfoQos[] = {"cam_0_info_qos", "cam_1_info_qos", "cam_2_info_qos",
-                                               "cam_3_info_qos"};
+static constexpr const char * kCamQueueSize[] = {"cam_0_queue_size", "cam_1_queue_size",
+                                                 "cam_2_queue_size", "cam_3_queue_size"};
+static constexpr const char * kCamLatch[] = {"cam_0_latch", "cam_1_latch", "cam_2_latch",
+                                             "cam_3_latch"};
+static constexpr const char * kCamInfoLatch[] = {"cam_0_info_latch", "cam_1_info_latch",
+                                                 "cam_2_info_latch", "cam_3_info_latch"};
+static constexpr const char * kCamInfoQueueSize[] = {
+    "cam_0_info_queue_size", "cam_1_info_queue_size", "cam_2_info_queue_size",
+    "cam_3_info_queue_size"};
 static constexpr const char * kQosSystemDefault = "SYSTEM_DEFAULT";
 static constexpr const char * kQosParameterEvents = "PARAMETER_EVENTS";
 static constexpr const char * kQosServicesDefault = "SERVICES_DEFAULT";
@@ -60,13 +65,14 @@ struct __attribute__((packed)) EepromData {
 };
 
 // needed because clpe callback does not support user data :(.
-static rclcpp::Node::SharedPtr kNode;
+static ros::NodeHandle * kNode;
 static std::vector<image_transport::Publisher> kImagePubs;
-static std::array<rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr, 4> kInfoPubs;
-static std::array<sensor_msgs::msg::CameraInfo, 4> kCamInfos;
+static std::array<ros::Publisher, 4> kInfoPubs;
+static std::array<sensor_msgs::CameraInfo, 4> kCamInfos;
 
 template <typename ClpeClientApi>
-class ClpeNode : public rclcpp::Node
+class ClpeNode : public ros::NodeHandle,
+                 public std::enable_shared_from_this<ClpeNode<ClpeClientApi>>
 {
 private:
   using Me = ClpeNode<ClpeClientApi>;
@@ -75,12 +81,12 @@ public:
   static std::shared_ptr<Me> make_shared(ClpeClientApi && clpe_api)
   {
     std::shared_ptr<Me> inst(new Me(std::move(clpe_api)));
-    inst->transport_ = std::make_unique<image_transport::ImageTransport>(inst->shared_from_this());
+    inst->transport_ = std::make_unique<image_transport::ImageTransport>(*inst->shared_from_this());
     if (kNode) {
-      RCLCPP_FATAL(inst->get_logger(), "only one instance allowed");
+      ROS_FATAL("only one instance allowed");
       exit(-1);
     }
-    kNode = inst->shared_from_this();
+    kNode = inst->shared_from_this().get();
     return inst;
   }
 
@@ -92,139 +98,105 @@ public:
   void Init()
   {
     // FIXME: This requires sudo password!!
-    const auto & password = this->get_parameter(kPassword).get_value<std::string>();
+    std::string password;
+    if (!this->getParam(kPassword, password)) {
+      ROS_FATAL("Password is required");
+      exit(-1);
+    }
     const auto result = this->clpe_api.Clpe_Connection(password);
     if (result != 0) {
-      RCLCPP_FATAL(this->get_logger(), "Failed to initiate the clpe network connection (" +
-                                           ConnectionError::get().message(result) + ")");
+      ROS_FATAL("Failed to initiate the clpe network connection (%s)",
+                ConnectionError::get().message(result).c_str());
       exit(result);
     }
 
     // publish tf
-    // use transient local with history depth 1 since the tf will never change.
-    rclcpp::QoS tf_qos(1);
-    tf_qos.reliable();
-    tf_qos.transient_local();
     for (int i = 0; i < 4; ++i) {
-      const auto tf_pub = this->create_publisher<geometry_msgs::msg::Transform>(
-          "cam_" + std::to_string(i) + "/tf", tf_qos);
-      geometry_msgs::msg::Transform tf_msg;
+      const auto tf_pub =
+          this->advertise<geometry_msgs::Transform>("cam_" + std::to_string(i) + "/tf", 1, true);
+      geometry_msgs::Transform tf_msg;
       auto pose = this->GetPoseParam_(i);
-      tf_pub->publish(Me::CreateTfMsg_(pose[0], pose[1], pose[2], pose[3], pose[4], pose[5]));
+      tf_pub.publish(Me::CreateTfMsg_(pose[0], pose[1], pose[2], pose[3], pose[4], pose[5]));
     }
 
     // reading eeprom is slow so the camera info is stored and reused.
-    RCLCPP_INFO(this->get_logger(), "Discovering camera properties");
+    ROS_INFO("Discovering camera properties");
     for (int i = 0; i < 4; ++i) {
       const auto error = this->GetCameraInfo_(i, kCamInfos[i]);
       if (error) {
-        RCLCPP_FATAL(this->get_logger(), "Failed to get camera info (" + error.message() + ")");
+        ROS_FATAL("Failed to get camera info (%s)", error.message().c_str());
         exit(error.value());
       }
     }
-    RCLCPP_INFO(this->get_logger(), "Successfully discovered camera properties");
+    ROS_INFO("Successfully discovered camera properties");
 
     // create camera publishers
     kImagePubs.reserve(4);
     for (int i = 0; i < 4; ++i) {
-      kImagePubs.emplace_back(image_transport::create_publisher(
-          this, "cam_" + std::to_string(i) + "/image_raw",
-          GetQos_(this->get_parameter(kCamQos[i]).get_value<std::string>()).get_rmw_qos_profile()));
-      kInfoPubs[i] = this->create_publisher<sensor_msgs::msg::CameraInfo>(
-          "cam_" + std::to_string(i) + "/camera_info",
-          this->GetQos_(this->get_parameter(kCamInfoQos[i]).get_value<std::string>()));
+      bool latch = this->param<bool>(kCamLatch[i], false);
+      int queue_size = this->param<int>(kCamQueueSize[i], 10);
+      kImagePubs.emplace_back(this->transport_->advertise("cam_" + std::to_string(i) + "/image_raw",
+                                                          queue_size, latch));
+      bool info_latch = this->param<bool>(kCamInfoLatch[i], false);
+      bool info_queue_size = this->param<int>(kCamInfoQueueSize[i], 10);
+      kInfoPubs[i] = this->advertise<sensor_msgs::CameraInfo>(
+          "cam_" + std::to_string(i) + "/camera_info", info_queue_size, info_latch);
     }
 
     // start publishing
     {
-      RCLCPP_INFO(this->get_logger(), "Preparing camera for streaming");
+      ROS_INFO("Preparing camera for streaming");
       const auto result = this->clpe_api.Clpe_StartStream(
           [](unsigned int cam_id, unsigned char * buffer, unsigned int size,
              struct timeval * frame_us) -> int {
-            RCLCPP_DEBUG(kNode->get_logger(), "got new image for cam_" + std::to_string(cam_id));
+            ROS_DEBUG("got new image for cam_%i", cam_id);
 
             // skip all work if there is no subscribers
             if (kImagePubs[cam_id].getNumSubscribers() == 0 &&
-                kInfoPubs[cam_id]->get_subscription_count() == 0) {
-              RCLCPP_DEBUG(kNode->get_logger(), "skipped publishing for cam_" +
-                                                    std::to_string(cam_id) +
-                                                    " because there are no subscribers");
+                kInfoPubs[cam_id].getNumSubscribers() == 0) {
+              ROS_DEBUG("skipped publishing for cam_%i because there are no subscribers", cam_id);
               return 0;
             }
 
-            sensor_msgs::msg::Image image;
+            sensor_msgs::Image image;
             Me::FillImageMsg_(buffer, size, *frame_us, image);
             kImagePubs[cam_id].publish(image);
-            kInfoPubs[cam_id]->publish(kCamInfos[cam_id]);
+            kInfoPubs[cam_id].publish(kCamInfos[cam_id]);
             return 0;
           },
           1, 1, 1, 1, 0);
       if (result != 0) {
         const std::error_code error(result, clpe::StartStreamError::get());
-        RCLCPP_FATAL(this->get_logger(), "Failed to start streaming (" + error.message() + ")");
+        ROS_FATAL("Failed to start streaming (%s)", error.message().c_str());
         exit(result);
       }
-      RCLCPP_INFO(this->get_logger(), "Start streaming images");
+      ROS_INFO("Start streaming images");
     }
   }
 
 private:
   std::unique_ptr<image_transport::ImageTransport> transport_;
 
-  explicit ClpeNode(ClpeClientApi && clpe_api) : rclcpp::Node("clpe"), clpe_api(std::move(clpe_api))
+  explicit ClpeNode(ClpeClientApi && clpe_api)
+      : ros::NodeHandle("clpe"), clpe_api(std::move(clpe_api))
   {
-    // declare ros params
-    {
-      rcl_interfaces::msg::ParameterDescriptor desc;
-      desc.description = "sudo password";
-      desc.read_only = true;
-      this->declare_parameter(kPassword, rclcpp::ParameterValue(), desc);
-    }
-    for (int i = 0; i < 4; ++i) {
-      rcl_interfaces::msg::ParameterDescriptor tf_desc;
-      tf_desc.description =
-          "Pose relative to the base, 6 values corresponding to [x, y, z, roll, pitch, yaw]";
-      this->declare_parameter(kCamPose[i], std::vector<double>({0, 0, 0, 0, 0, 0}));
-
-      rcl_interfaces::msg::ParameterDescriptor base_frame_desc;
-      base_frame_desc.description = "Defines the frame_id all static transformations refers to";
-      base_frame_desc.read_only = true;
-      this->declare_parameter(kCamBaseFrame[i], "base_link");
-
-      rcl_interfaces::msg::ParameterDescriptor qos_desc;
-      qos_desc.description =
-          "Sets the QoS by which the topic is published. Available values are the following "
-          "strings: SYSTEM_DEFAULT, PARAMETER_EVENTS, SERVICES_DEFAULT, PARAMETERS, DEFAULT, "
-          "SENSOR_DATA, HID_DEFAULT (= DEFAULT with depth of 100), EXTRINSICS_DEFAULT (= DEFAULT "
-          "with depth of 1 and transient local durabilty). Default is SENSOR_DATA.";
-      qos_desc.read_only = true;
-      this->declare_parameter(kCamQos[i], "SENSOR_DATA");
-
-      rcl_interfaces::msg::ParameterDescriptor info_qos_desc;
-      info_qos_desc.description =
-          "Sets the QoS by which the info topic is published. Available values are the following "
-          "strings: SYSTEM_DEFAULT, PARAMETER_EVENTS, SERVICES_DEFAULT, PARAMETERS, DEFAULT, "
-          "SENSOR_DATA, HID_DEFAULT (= DEFAULT with depth of 100), EXTRINSICS_DEFAULT (= DEFAULT "
-          "with depth of 1 and transient local durabilty). Default is SYSTEM_DEFAULT.";
-      info_qos_desc.read_only = true;
-      this->declare_parameter(kCamInfoQos[i], "SYSTEM_DEFAULT");
-    }
   }
 
   std::vector<double> GetPoseParam_(int cam_id)
   {
-    auto pose = this->get_parameter(kCamPose[cam_id]).get_value<std::vector<double>>();
+    std::vector<double> defaultPose({0, 0, 0, 0, 0, 0});
+    std::vector<double> pose = this->param<std::vector<double>>(kCamPose[cam_id], defaultPose);
     if (pose.size() != 6) {
-      RCLCPP_FATAL(this->get_logger(), "Failed to get pose parameter, wrong number of elements");
+      ROS_FATAL("Failed to get pose parameter, wrong number of elements");
       exit(-1);
     }
     return pose;
   }
 
-  static geometry_msgs::msg::Transform CreateTfMsg_(double x, double y, double z, double roll,
-                                                    double pitch, double yaw)
+  static geometry_msgs::Transform CreateTfMsg_(double x, double y, double z, double roll,
+                                               double pitch, double yaw)
   {
-    geometry_msgs::msg::Transform tf_msg;
+    geometry_msgs::Transform tf_msg;
     tf_msg.translation.x = x;
     tf_msg.translation.y = y;
     tf_msg.translation.z = z;
@@ -240,10 +212,10 @@ private:
   /**
    * Reading the camera's eeprom is slow so callers should cache the result
    */
-  std::error_code GetCameraInfo_(int cam_id, sensor_msgs::msg::CameraInfo & cam_info)
+  std::error_code GetCameraInfo_(int cam_id, sensor_msgs::CameraInfo & cam_info)
   {
     // reset to defaults
-    cam_info = sensor_msgs::msg::CameraInfo();
+    cam_info = sensor_msgs::CameraInfo();
     // calibration may change anytime for self calibrating systems, so we cannot cache the cam info.
     cam_info.width = 1920;
     cam_info.height = 1080;
@@ -261,18 +233,18 @@ private:
         cam_info.distortion_model = sensor_msgs::distortion_models::EQUIDISTANT;
         break;
     }
-    cam_info.k = {eeprom_data.fx, 0, eeprom_data.cx, 0, eeprom_data.fy, eeprom_data.cy, 0, 0, 1};
-    cam_info.d = {eeprom_data.k1, eeprom_data.k2, eeprom_data.p1,
+    cam_info.K = {eeprom_data.fx, 0, eeprom_data.cx, 0, eeprom_data.fy, eeprom_data.cy, 0, 0, 1};
+    cam_info.D = {eeprom_data.k1, eeprom_data.k2, eeprom_data.p1,
                   eeprom_data.p2, eeprom_data.k3, eeprom_data.k4};
     return kNoError;
   }
 
   static void FillImageMsg_(unsigned char * buffer, unsigned int size, const timeval & timestamp,
-                            sensor_msgs::msg::Image & image)
+                            sensor_msgs::Image & image)
   {
     image.header.frame_id = "base_link";
     image.header.stamp.sec = timestamp.tv_sec;
-    image.header.stamp.nanosec = timestamp.tv_usec * 1000;
+    image.header.stamp.nsec = timestamp.tv_usec * 1000;
     // buffer is only valid for 16 frames, since ros2 publish has no real time guarantees, we must
     // copy the data out to avoid UB.
     image.data = std::vector<uint8_t>(buffer, buffer + size);
@@ -284,7 +256,7 @@ private:
     image.is_bigendian = false;
   }
 
-  std::error_code GetCameraImage_(int cam_id, sensor_msgs::msg::Image & image)
+  std::error_code GetCameraImage_(int cam_id, sensor_msgs::Image & image)
   {
     unsigned char * buffer;
     unsigned int size;
@@ -295,30 +267,6 @@ private:
     }
     this->FillImageMsg_(buffer, size, timestamp, image);
     return kNoError;
-  }
-
-  static rclcpp::QoS GetQos_(const std::string & val)
-  {
-    if (val == kQosSystemDefault) {
-      return rclcpp::SystemDefaultsQoS();
-    } else if (val == kQosParameterEvents) {
-      return rclcpp::ParameterEventsQoS();
-    } else if (val == kQosServicesDefault) {
-      return rclcpp::ServicesQoS();
-    } else if (val == kQosParameters) {
-      return rclcpp::ParametersQoS();
-    } else if (val == kQosDefault) {
-      return rclcpp::QoS(10);
-    } else if (val == kQosSensorData) {
-      return rclcpp::SensorDataQoS();
-    } else if (val == kQosHidDefault) {
-      return rclcpp::QoS(100);
-    } else if (val == kQosExtrinsicsDefault) {
-      auto qos = rclcpp::QoS(1);
-      qos.transient_local();
-      return qos;
-    }
-    return rclcpp::SystemDefaultsQoS();
   }
 
   friend class ClpeComponentNode;

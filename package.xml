@@ -12,10 +12,5 @@
   <depend>rclcpp</depend>
   <depend>image_transport</depend>
 
-  <build_depend>ament_cmake</build_depend>
-  <buildtool_depend>python3-colcon-common-extensions</buildtool_depend>
-
-  <export>
-    <build_type>ament_cmake</build_type>
-  </export>
+  <buildtool_depend>catkin</buildtool_depend>
 </package>
