@@ -10,8 +10,7 @@ pkg_search_module(gstreamer_app gstreamer-app-1.0 REQUIRED)
 
 add_library(${PROJECT_NAME}_lib INTERFACE)
 target_include_directories(${PROJECT_NAME}_lib INTERFACE
-  libclpe/include
-  ${sensor_msgs_INCLUDE_DIRS})
+  libclpe/include)
 target_link_libraries(${PROJECT_NAME}_lib INTERFACE
   ${CMAKE_CURRENT_SOURCE_DIR}/libclpe/lib/libclpe.a
   rclcpp::rclcpp

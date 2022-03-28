@@ -75,7 +75,6 @@ public:
   static std::shared_ptr<Me> make_shared(ClpeClientApi && clpe_api)
   {
     std::shared_ptr<Me> inst(new Me(std::move(clpe_api)));
-    inst->transport_ = std::make_unique<image_transport::ImageTransport>(inst->shared_from_this());
     if (kNode) {
       RCLCPP_FATAL(inst->get_logger(), "only one instance allowed");
       exit(-1);
@@ -169,8 +168,6 @@ public:
   }
 
 private:
-  std::unique_ptr<image_transport::ImageTransport> transport_;
-
   explicit ClpeNode(ClpeClientApi && clpe_api) : rclcpp::Node("clpe"), clpe_api(std::move(clpe_api))
   {
     // declare ros params
