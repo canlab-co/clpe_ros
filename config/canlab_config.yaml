@@ -1,8 +1,0 @@
-canlab_ros:
-  ros__parameters:
-    camera_names: ["cam_0", "cam_1", "cam_2", "cam_3"]
-    camera_qos: ["SENSOR_DATA", "SENSOR_DATA", "SENSOR_DATA", "SENSOR_DATA"]
-# Available QoS values are the following strings:
-# SYSTEM_DEFAULT, PARAMETER_EVENTS, SERVICES_DEFAULT, PARAMETERS, DEFAULT,
-# SENSOR_DATA, HID_DEFAULT (= DEFAULT with depth of 100),
-# EXTRINSICS_DEFAULT (= DEFAULT with depth of 1 and transient local durability).

@@ -21,9 +21,9 @@ enum class CalibrationModel : uint32_t {
 
 static constexpr const char * kPassword = "password";
 static constexpr const char * kCamPose[] = {"cam_0_pose", "cam_1_pose", "cam_2_pose", "cam_3_pose"};
-static constexpr const char * kCamBaseFrame[] = {"cam_0_base_frame", "cam_1_base_frame",
-                                                 "cam_2_base_frame", "cam_3_base_frame"};
-static constexpr const char * kCamQos[] = {"cam_0_qos", "cam_1_qos", "cam_2_qos", "cam_3_qos"};
+static constexpr const char * kCamBaseFrame[] = {"cam_0_frame_id", "cam_1_frame_id",
+                                                 "cam_2_frame_id", "cam_3_frame_id"};
+static constexpr const char * kCamQos[] = {"cam_0_image_qos", "cam_1_image_qos", "cam_2_image_qos", "cam_3_image_qos"};
 static constexpr const char * kCamInfoQos[] = {"cam_0_info_qos", "cam_1_info_qos", "cam_2_info_qos",
                                                "cam_3_info_qos"};
 static constexpr const char * kQosSystemDefault = "SYSTEM_DEFAULT";
