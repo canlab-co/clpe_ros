@@ -18,7 +18,7 @@ rosrun clpe_ros clpe_ros _password:=<sudo-password>
 
 # Configuration
 
-The driver supports the follow ros parameters to configure it's behavior.
+The driver supports the following ros parameters to configure it's behavior.
 
 | Key | Description | Default |
 |-|-|-|
