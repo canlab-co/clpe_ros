@@ -195,7 +195,7 @@ private:
           "Sets the QoS by which the topic is published. Available values are the following "
           "strings: SYSTEM_DEFAULT, PARAMETER_EVENTS, SERVICES_DEFAULT, PARAMETERS, DEFAULT, "
           "SENSOR_DATA, HID_DEFAULT (= DEFAULT with depth of 100), EXTRINSICS_DEFAULT (= DEFAULT "
-          "with depth of 1 and transient local durabilty). Default is SENSOR_DATA.";
+          "with depth of 1 and transient local durability). Default is SENSOR_DATA.";
       qos_desc.read_only = true;
       this->declare_parameter(kCamQos[i], "SENSOR_DATA");
 
@@ -204,7 +204,7 @@ private:
           "Sets the QoS by which the info topic is published. Available values are the following "
           "strings: SYSTEM_DEFAULT, PARAMETER_EVENTS, SERVICES_DEFAULT, PARAMETERS, DEFAULT, "
           "SENSOR_DATA, HID_DEFAULT (= DEFAULT with depth of 100), EXTRINSICS_DEFAULT (= DEFAULT "
-          "with depth of 1 and transient local durabilty). Default is SYSTEM_DEFAULT.";
+          "with depth of 1 and transient local durability). Default is SYSTEM_DEFAULT.";
       info_qos_desc.read_only = true;
       this->declare_parameter(kCamInfoQos[i], "SYSTEM_DEFAULT");
     }
