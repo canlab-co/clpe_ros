@@ -152,7 +152,9 @@ public:
             }
 
             sensor_msgs::msg::Image image;
-            Me::FillImageMsg_(buffer, size, *frame_us, image);
+            const auto frame_id =
+                kNode->get_parameter(kCamBaseFrame[cam_id]).get_value<std::string>();
+            Me::FillImageMsg_(buffer, size, *frame_us, frame_id, image);
             kImagePubs[cam_id].publish(image);
             kInfoPubs[cam_id]->publish(kCamInfos[cam_id]);
             return 0;
@@ -265,9 +267,9 @@ private:
   }
 
   static void FillImageMsg_(unsigned char * buffer, unsigned int size, const timeval & timestamp,
-                            sensor_msgs::msg::Image & image)
+                            const std::string & frame_id, sensor_msgs::msg::Image & image)
   {
-    image.header.frame_id = "base_link";
+    image.header.frame_id = frame_id;
     image.header.stamp.sec = timestamp.tv_sec;
     image.header.stamp.nanosec = timestamp.tv_usec * 1000;
     // buffer is only valid for 16 frames, since ros2 publish has no real time guarantees, we must
@@ -290,7 +292,8 @@ private:
     if (result != 0) {
       return std::error_code(result, GetFrameError::get());
     }
-    this->FillImageMsg_(buffer, size, timestamp, image);
+    this->FillImageMsg_(buffer, size, timestamp,
+                        this->get_parameter(kCamBaseFrame[cam_id]).get_value<std::string>(), image);
     return kNoError;
   }
 
