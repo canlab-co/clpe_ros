@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format2.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>canlab_ros</name>
+  <name>clpe_ros</name>
   <version>0.1.0</version>
-  <description>ROS driver for canlab camera system</description>
+  <description>ROS driver for CANLAB CLPE-G-NVP2650D</description>
   <maintainer email="none@none.com">None</maintainer>
   <!-- <license>Apache License 2.0</license> -->
   <license>Unspecified</license>

@@ -1,7 +1,7 @@
 #include <ClpeClientApi.h>
 
 #include "ClpeNode.hpp"
-#include "canlab_ros_component_export.h"
+#include "clpe_ros_component_export.h"
 #include "rclcpp_components/register_node_macro.hpp"
 
 namespace clpe
@@ -9,13 +9,13 @@ namespace clpe
 class ClpeComponentNode
 {
 public:
-  CANLAB_ROS_COMPONENT_EXPORT
+  CLPE_ROS_COMPONENT_EXPORT
   ClpeComponentNode(const rclcpp::NodeOptions & node)
   {
     this->node_ = ClpeNode<ClpeClientApi>::make_shared(ClpeClientApi());
   }
 
-  CANLAB_ROS_COMPONENT_EXPORT
+  CLPE_ROS_COMPONENT_EXPORT
   rclcpp::node_interfaces::NodeBaseInterface::SharedPtr get_node_base_interface() const
   {
     return this->node_->get_node_base_interface();
