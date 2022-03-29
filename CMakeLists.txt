@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(canlab_ros)
+project(clpe_ros)
 
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -51,8 +51,8 @@ install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION lib/${PROJECT_NAME})
 #     "${CMAKE_CURRENT_BINARY_DIR}/test_ament_index/$<CONFIG>/share/ament_index/resource_index/node_plugin/${PROJECT_NAME}"
 #   CONTENT "${node_plugins}")
 
-option(CANLAB_ROS_BUILD_BENCHMARKS "build benchmarks")
-if (${CANLAB_ROS_BUILD_BENCHMARKS})
+option(CLPE_ROS_BUILD_BENCHMARKS "build benchmarks")
+if (${CLPE_ROS_BUILD_BENCHMARKS})
   add_subdirectory(benchmarks)
 endif()
 
