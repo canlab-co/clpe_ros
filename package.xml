@@ -11,6 +11,8 @@
 
   <depend>roscpp</depend>
   <depend>image_transport</depend>
+  <depend>geometry_msgs</depend>
+  <depend>sensor_msgs</depend>
 
   <buildtool_depend>catkin</buildtool_depend>
 </package>
