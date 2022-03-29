@@ -1,3 +1,20 @@
+/*
+ * Copyright (C) 2022 [PLACEHOLDER]
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+*/
+
 #pragma once
 
 #include <tf2/LinearMath/Quaternion.h>
@@ -12,8 +29,10 @@
 
 #include "errors.hpp"
 
-namespace clpe
-{
+//==============================================================================
+namespace clpe {
+
+//==============================================================================
 enum class CalibrationModel : uint32_t {
   Jhang = 0,
   FishEye = 1,
@@ -35,7 +54,7 @@ static constexpr const char * kQosSensorData = "SENSOR_DATA";
 static constexpr const char * kQosHidDefault = "HID_DEFAULT";
 static constexpr const char * kQosExtrinsicsDefault = "EXTRINSICS_DEFAULT";
 
-// TODO: docs say 95 bytes, but reference sheet is 107 bytes
+//==============================================================================
 struct __attribute__((packed)) EepromData {
   uint16_t signature_code;
   uint64_t version;
@@ -65,6 +84,7 @@ static std::vector<image_transport::Publisher> kImagePubs;
 static std::array<rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr, 4> kInfoPubs;
 static std::array<sensor_msgs::msg::CameraInfo, 4> kCamInfos;
 
+//==============================================================================
 template <typename ClpeClientApi>
 class ClpeNode : public rclcpp::Node
 {
@@ -140,6 +160,7 @@ public:
       const auto result = this->clpe_api.Clpe_StartStream(
           [](unsigned int cam_id, unsigned char * buffer, unsigned int size,
              struct timeval * frame_us) -> int {
+            const auto start_time = std::chrono::steady_clock::now();
             RCLCPP_DEBUG(kNode->get_logger(), "got new image for cam_" + std::to_string(cam_id));
 
             // skip all work if there is no subscribers
@@ -154,9 +175,17 @@ public:
             sensor_msgs::msg::Image image;
             const auto frame_id =
                 kNode->get_parameter(kCamBaseFrame[cam_id]).get_value<std::string>();
-            Me::FillImageMsg_(buffer, size, *frame_us, frame_id, image);
+            Me::FillImageMsg_(buffer, size, frame_id, image);
+            const auto time_after_fill = std::chrono::steady_clock::now();
             kImagePubs[cam_id].publish(image);
             kInfoPubs[cam_id]->publish(kCamInfos[cam_id]);
+            const auto time_after_pub = std::chrono::steady_clock::now();
+
+            RCLCPP_DEBUG(
+              kNode->get_logger(),
+              "Time to fill msg: %ld us. Time to publish: %ld us",
+              (time_after_fill - start_time).count() / 1000,
+              (time_after_pub - time_after_fill).count() /1000);
             return 0;
           },
           1, 1, 1, 1, 0);
@@ -266,12 +295,10 @@ private:
     return kNoError;
   }
 
-  static void FillImageMsg_(unsigned char * buffer, unsigned int size, const timeval & timestamp,
+  static void FillImageMsg_(unsigned char * buffer, unsigned int size,
                             const std::string & frame_id, sensor_msgs::msg::Image & image)
   {
     image.header.frame_id = frame_id;
-    image.header.stamp.sec = timestamp.tv_sec;
-    image.header.stamp.nanosec = timestamp.tv_usec * 1000;
     // buffer is only valid for 16 frames, since ros2 publish has no real time guarantees, we must
     // copy the data out to avoid UB.
     image.data = std::vector<uint8_t>(buffer, buffer + size);
@@ -281,6 +308,7 @@ private:
     // assume that each row is same sized.
     image.step = size / 1080;
     image.is_bigendian = false;
+    image.header.stamp = kNode->get_clock()->now();
   }
 
   std::error_code GetCameraImage_(int cam_id, sensor_msgs::msg::Image & image)
@@ -292,7 +320,7 @@ private:
     if (result != 0) {
       return std::error_code(result, GetFrameError::get());
     }
-    this->FillImageMsg_(buffer, size, timestamp,
+    this->FillImageMsg_(buffer, size,
                         this->get_parameter(kCamBaseFrame[cam_id]).get_value<std::string>(), image);
     return kNoError;
   }
