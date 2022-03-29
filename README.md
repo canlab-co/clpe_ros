@@ -39,7 +39,7 @@ Unless specified otherwise, all parameters are read-only, that is, they must be 
 * CANLAB CLPE-G-NVP2650D supplied PC
 * ROS noetic
 * rosdep
-* colcon
+* catkin
 * git
 
 The PC that comes with CLPE-G-NVP2650D should already contain a suitable ROS distro. If it is not available, ROS noetic needs to be built from source as the default OS of the PC is not supported. See http://wiki.ros.org/noetic/Installation/Source for instructions. Alternatively, containers or VM may be used but the CLPE-G-NVP2650D drivers has to be properly passthroughed.
@@ -54,7 +54,7 @@ cd <workspace>/src
 Obtain sources
 
 ```bash
-git clone https://github.com/osrf/canlab
+git clone -b noetic https://github.com/osrf/canlab
 ```
 
 Install dependencies
@@ -67,5 +67,5 @@ rosdep install --from-paths src -i
 Compile
 
 ```bash
-colcon build --cmake-args -DCMAKE_BUILD_TYPE=DEBUG --packages-up-to clpe_ros
+catkin_make
 ```
