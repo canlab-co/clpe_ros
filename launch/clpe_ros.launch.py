@@ -43,10 +43,10 @@ def generate_launch_description():
     )
 
     canlab_node = Node(
-            package='canlab_ros',
-            namespace='canlab',
-            executable='canlab_ros',
-            name='canlab_ros',
+            package='clpe_ros',
+            namespace='clpe',
+            executable='clpe_ros',
+            name='clpe_ros',
             parameters=[parameters, {
                 "password": LaunchConfiguration('password'),
             }]

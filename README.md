@@ -13,7 +13,7 @@ The PC that comes with CLPE-G-NVP2650D should already contain a suitable ROS2 di
 
 ```bash
 source /opt/ros/foxy/setup.bash
-ros2 run clpe_ros clpe_ros --ros-args password:=<sudo-password>
+ros2 launch clpe_ros clpe_ros.launch.py password:=<sudo-password>
 ```
 
 # Configuration
@@ -24,8 +24,8 @@ The driver supports the following ros parameters to configure it's behavior.
 |-|-|-|
 | password | sudo password | *\*Required\** |
 | cam_{n}_pose | Pose relative to the base, 6 values corresponding to [x, y, z, roll, pitch, yaw] | [0,0,0,0,0,0] |
-| cam_{n}_base_frame | Defines the frame_id all static transformations refers to | base_link |
-| cam_{n}_qos | Sets the QoS by which the topic is published. Available values are the following strings: SYSTEM_DEFAULT, PARAMETER_EVENTS, SERVICES_DEFAULT, PARAMETERS, DEFAULT, SENSOR_DATA, HID_DEFAULT (= DEFAULT with depth of 100), EXTRINSICS_DEFAULT (= DEFAULT with depth of 1 and transient local durabilty). | SENSOR_DATA |
+| cam_{n}_frame_id | Defines the frame_id all static transformations refers to | base_link |
+| cam_{n}_image_qos | Sets the QoS by which the topic is published. Available values are the following strings: SYSTEM_DEFAULT, PARAMETER_EVENTS, SERVICES_DEFAULT, PARAMETERS, DEFAULT, SENSOR_DATA, HID_DEFAULT (= DEFAULT with depth of 100), EXTRINSICS_DEFAULT (= DEFAULT with depth of 1 and transient local durabilty). | SENSOR_DATA |
 | cam_{n}_info_qos | Sets the QoS by which the topic is published. Available values are the following strings: SYSTEM_DEFAULT, PARAMETER_EVENTS, SERVICES_DEFAULT, PARAMETERS, DEFAULT, SENSOR_DATA, HID_DEFAULT (= DEFAULT with depth of 100), EXTRINSICS_DEFAULT (= DEFAULT with depth of 1 and transient local durabilty). | SYSTEM_DEFAULT |
 
 Unless specified otherwise, all parameters are read-only, that is, they must be initialized at startup and cannot be changed at runtime.
