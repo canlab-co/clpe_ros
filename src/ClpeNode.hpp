@@ -159,7 +159,8 @@ public:
             }
 
             sensor_msgs::Image image;
-            Me::FillImageMsg_(buffer, size, *frame_us, image);
+            const auto frame_id = kNode->param<std::string>(kCamBaseFrame[cam_id], "base_link");
+            Me::FillImageMsg_(buffer, size, *frame_us, frame_id, image);
             kImagePubs[cam_id].publish(image);
             kInfoPubs[cam_id].publish(kCamInfos[cam_id]);
             return 0;
@@ -177,8 +178,7 @@ public:
 private:
   std::unique_ptr<image_transport::ImageTransport> transport_;
 
-  explicit ClpeNode(ClpeClientApi && clpe_api)
-      : ros::NodeHandle("~"), clpe_api(std::move(clpe_api))
+  explicit ClpeNode(ClpeClientApi && clpe_api) : ros::NodeHandle("~"), clpe_api(std::move(clpe_api))
   {
   }
 
@@ -240,9 +240,9 @@ private:
   }
 
   static void FillImageMsg_(unsigned char * buffer, unsigned int size, const timeval & timestamp,
-                            sensor_msgs::Image & image)
+                            const std::string & frame_id, sensor_msgs::Image & image)
   {
-    image.header.frame_id = "base_link";
+    image.header.frame_id = frame_id;
     image.header.stamp.sec = timestamp.tv_sec;
     image.header.stamp.nsec = timestamp.tv_usec * 1000;
     // buffer is only valid for 16 frames, since ros2 publish has no real time guarantees, we must
@@ -265,7 +265,8 @@ private:
     if (result != 0) {
       return std::error_code(result, GetFrameError::get());
     }
-    this->FillImageMsg_(buffer, size, timestamp, image);
+    this->FillImageMsg_(buffer, size, timestamp,
+                        this->param<std::string>(kCamBaseFrame[cam_id], "base_link"), image);
     return kNoError;
   }
 
