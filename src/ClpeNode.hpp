@@ -27,6 +27,7 @@
 #include <sensor_msgs/image_encodings.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <sensor_msgs/msg/image.hpp>
+#include <unordered_map>
 
 #include "errors.hpp"
 
@@ -151,7 +152,7 @@ public:
     for (int i = 0; i < 4; ++i) {
       if (!this->cam_enabled_[i]) {
         RCLCPP_INFO(this->get_logger(),
-                     "Skipped cam_" + std::to_string(i) + " because it is not enabled");
+                    "Skipped cam_" + std::to_string(i) + " because it is not enabled");
         continue;
       }
       const auto error = this->GetCameraInfo_(i, kCamInfos[i]);
@@ -165,9 +166,12 @@ public:
     // create camera publishers
     kImagePubs.reserve(4);
     for (int i = 0; i < 4; ++i) {
-      kImagePubs.emplace_back(image_transport::create_publisher(
+      if (!this->cam_enabled_[i]) {
+        continue;
+      }
+      kImagePubs[i] = image_transport::create_publisher(
           this, "cam_" + std::to_string(i) + "/image_raw",
-          GetQos_(this->get_parameter(kCamQos[i]).get_value<std::string>()).get_rmw_qos_profile()));
+          GetQos_(this->get_parameter(kCamQos[i]).get_value<std::string>()).get_rmw_qos_profile());
       kInfoPubs[i] = this->create_publisher<sensor_msgs::msg::CameraInfo>(
           "cam_" + std::to_string(i) + "/camera_info",
           this->GetQos_(this->get_parameter(kCamInfoQos[i]).get_value<std::string>()));
@@ -221,7 +225,7 @@ public:
 private:
   // needed because clpe callback does not support user data :(.
   static Me * kNode_;
-  static std::vector<image_transport::Publisher> kImagePubs;
+  static std::unordered_map<int, image_transport::Publisher> kImagePubs;
   static std::array<rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr, 4> kInfoPubs;
   static std::array<sensor_msgs::msg::CameraInfo, 4> kCamInfos;
 
@@ -419,7 +423,7 @@ private:
 template <typename ClpeClientApi>
 ClpeNode<ClpeClientApi> * ClpeNode<ClpeClientApi>::kNode_;
 template <typename ClpeClientApi>
-std::vector<image_transport::Publisher> ClpeNode<ClpeClientApi>::kImagePubs;
+std::unordered_map<int, image_transport::Publisher> ClpeNode<ClpeClientApi>::kImagePubs;
 template <typename ClpeClientApi>
 std::array<rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr, 4>
     ClpeNode<ClpeClientApi>::kInfoPubs;
