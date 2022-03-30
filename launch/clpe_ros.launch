@@ -2,7 +2,7 @@
 <launch>
   <arg name="password" default=""/>
   <arg name="encoding" default="yuv422"/>
-  <arg name="config" default="(find clpe_ros)/config/clpe_config.yaml"/>
+  <arg name="config" default="$(find clpe_ros)/config/clpe_config.yaml"/>
 
   <node name="clpe_ros" pkg="clpe_ros" type="clpe_ros" output="screen">
     <param name="password" value="$(arg password)"/>
