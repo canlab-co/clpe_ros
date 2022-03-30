@@ -151,6 +151,9 @@ public:
     // create camera publishers
     kImagePubs.reserve(4);
     for (int i = 0; i < 4; ++i) {
+      if (!this->cam_enabled_[i]) {
+        continue;
+      }
       bool latch = this->param<bool>(kCamLatch[i], false);
       int queue_size = this->param<int>(kCamQueueSize[i], 10);
       kImagePubs.emplace_back(this->transport_->advertise("cam_" + std::to_string(i) + "/image_raw",
