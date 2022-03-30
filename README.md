@@ -34,6 +34,7 @@ The driver supports the following ros parameters to configure it's behavior.
 |-|-|-|
 | password | sudo password | *\*Required\** |
 | encoding | Image encoding, supported formats are: bgr8, bgra8, rgb8, rgba8, mono16, yuv422. Defaults to yuv422. Note that encodings other than yuv422 incurs conversion overhead. | yuv422 |
+| cam_{n}_enable | Enable camera | true |
 | cam_{n}_pose | Pose relative to the base, 6 values corresponding to [x, y, z, roll, pitch, yaw] | [0,0,0,0,0,0] |
 | cam_{n}_base_frame | Defines the frame_id all static transformations refers to | base_link |
 | cam_{n}_latch | Controls latching for camera image messages | false |

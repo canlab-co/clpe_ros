@@ -10,6 +10,8 @@
 #include <sensor_msgs/image_encodings.h>
 #include <tf2/LinearMath/Quaternion.h>
 
+#include <unordered_map>
+
 #include "errors.hpp"
 
 namespace clpe
@@ -37,6 +39,8 @@ static constexpr std::array<const char *, 6> kSupportedEncodings({
 
 static constexpr const char * kPassword = "password";
 static constexpr const char * kEncoding = "encoding";
+static constexpr const char * kCamEnable[] = {"cam_0_enable", "cam_1_enable", "cam_2_enable",
+                                              "cam_3_enable"};
 static constexpr const char * kCamPose[] = {"cam_0_pose", "cam_1_pose", "cam_2_pose", "cam_3_pose"};
 static constexpr const char * kCamBaseFrame[] = {"cam_0_frame_id", "cam_1_frame_id",
                                                  "cam_2_frame_id", "cam_3_frame_id"};
@@ -126,6 +130,10 @@ public:
     // reading eeprom is slow so the camera info is stored and reused.
     ROS_INFO("Discovering camera properties");
     for (int i = 0; i < 4; ++i) {
+      if (!this->cam_enabled_[i]) {
+        ROS_INFO("Skipped cam_%i  because it is not enabled", i);
+        continue;
+      }
       const auto error = this->GetCameraInfo_(i, kCamInfos[i]);
       if (error) {
         ROS_FATAL("Failed to get camera info (%s)", error.message().c_str());
@@ -137,10 +145,13 @@ public:
     // create camera publishers
     kImagePubs.reserve(4);
     for (int i = 0; i < 4; ++i) {
+      if (!this->cam_enabled_[i]) {
+        continue;
+      }
       bool latch = this->param<bool>(kCamLatch[i], false);
       int queue_size = this->param<int>(kCamQueueSize[i], 10);
-      kImagePubs.emplace_back(this->transport_->advertise("cam_" + std::to_string(i) + "/image_raw",
-                                                          queue_size, latch));
+      kImagePubs[i] =
+          this->transport_->advertise("cam_" + std::to_string(i) + "/image_raw", queue_size, latch);
       bool info_latch = this->param<bool>(kCamInfoLatch[i], false);
       bool info_queue_size = this->param<int>(kCamInfoQueueSize[i], 10);
       kInfoPubs[i] = this->advertise<sensor_msgs::CameraInfo>(
@@ -170,7 +181,8 @@ public:
             kInfoPubs[cam_id].publish(kCamInfos[cam_id]);
             return 0;
           },
-          1, 1, 1, 1, 0);
+          static_cast<int>(this->cam_enabled_[0]), static_cast<int>(this->cam_enabled_[1]),
+          static_cast<int>(this->cam_enabled_[2]), static_cast<int>(this->cam_enabled_[3]), 0);
       if (result != 0) {
         const std::error_code error(result, clpe::StartStreamError::get());
         ROS_FATAL("Failed to start streaming (%s)", error.message().c_str());
@@ -183,16 +195,20 @@ public:
 private:
   // needed because clpe callback does not support user data :(.
   static Me * kNode_;
-  static std::vector<image_transport::Publisher> kImagePubs;
+  static std::unordered_map<int, image_transport::Publisher> kImagePubs;
   static std::array<ros::Publisher, 4> kInfoPubs;
   static std::array<sensor_msgs::CameraInfo, 4> kCamInfos;
 
   std::unique_ptr<image_transport::ImageTransport> transport_;
   std::string encoding_;
+  std::array<bool, 4> cam_enabled_;
 
   explicit ClpeNode(ClpeClientApi && clpe_api) : ros::NodeHandle("~"), clpe_api(std::move(clpe_api))
   {
     this->encoding_ = this->GetEncoding_();
+    for (int i = 0; i < 4; ++i) {
+      this->cam_enabled_[i] = this->param(kCamEnable[i], true);
+    }
   }
 
   std::vector<double> GetPoseParam_(int cam_id)
@@ -308,7 +324,7 @@ private:
 template <typename ClpeClientApi>
 ClpeNode<ClpeClientApi> * ClpeNode<ClpeClientApi>::kNode_;
 template <typename ClpeClientApi>
-std::vector<image_transport::Publisher> ClpeNode<ClpeClientApi>::kImagePubs;
+std::unordered_map<int, image_transport::Publisher> ClpeNode<ClpeClientApi>::kImagePubs;
 template <typename ClpeClientApi>
 std::array<ros::Publisher, 4> ClpeNode<ClpeClientApi>::kInfoPubs;
 template <typename ClpeClientApi>
