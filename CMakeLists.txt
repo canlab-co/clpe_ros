@@ -33,6 +33,13 @@ add_executable(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_lib)
 install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION lib/${PROJECT_NAME})
 
+install(DIRECTORY launch
+        DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+        PATTERN "*~" EXCLUDE)
+install(DIRECTORY config
+        DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+        PATTERN "*~" EXCLUDE)
+
 option(CLPE_ROS_BUILD_BENCHMARKS "build benchmarks")
 if (${CLPE_ROS_BUILD_BENCHMARKS})
   add_subdirectory(benchmarks)
