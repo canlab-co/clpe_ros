@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="namespace" default="clpe"/>
+  <arg name="password" default=""/>
+  <arg name="encoding" default="yuv422"/>
+
+
+  <group ns="$(arg namespace)">
+    <node name="clpe_ros"
+        pkg="clpe_ros"
+        type="clpe_ros"
+        output="screen">
+        <rosparam subst_value="true">
+          password: $(arg password)
+        </rosparam>
+    </node>
+  </group>
+
+</launch>
