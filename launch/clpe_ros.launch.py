@@ -42,17 +42,23 @@ def generate_launch_description():
         "password", default_value=TextSubstitution(text="0")
     )
 
+    encoding_arg = DeclareLaunchArgument(
+        "encoding", default_value=TextSubstitution(text="yuv422")
+    )
+
     canlab_node = Node(
             package='clpe_ros',
             namespace='clpe',
             executable='clpe_ros',
             name='clpe_ros',
             parameters=[parameters, {
+                "encoding": LaunchConfiguration('encoding'),
                 "password": LaunchConfiguration('password'),
             }]
         )
 
     return LaunchDescription([
         password_arg,
+        encoding_arg,
         canlab_node,
     ])

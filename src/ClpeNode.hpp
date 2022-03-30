@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
-*/
+ */
 
 #pragma once
 
+#include <cv_bridge/cv_bridge.h>
 #include <tf2/LinearMath/Quaternion.h>
 
 #include <geometry_msgs/msg/transform.hpp>
@@ -30,19 +31,37 @@
 #include "errors.hpp"
 
 //==============================================================================
-namespace clpe {
-
+namespace clpe
+{
 //==============================================================================
 enum class CalibrationModel : uint32_t {
   Jhang = 0,
   FishEye = 1,
 };
 
+// Supported types by cv_bridge
+// https://github.com/ros-perception/vision_opencv/blob/c791220cefd0abf02c6719e2ce0fea465857a88e/cv_bridge/include/cv_bridge/cv_bridge.h#L202
+// using array instead of enum to allow iteration.
+static constexpr std::array<const char *, 6> kSupportedEncodings({
+    // cv_bridge only supports converting to from color to mono of the same channels, so "mono8"
+    // is not supported.
+    // "mono8"
+    "bgr8",
+    "bgra8",
+    "rgb8",
+    "rgba8",
+    "mono16",
+    // camera encoding
+    "yuv422",
+});
+
 static constexpr const char * kPassword = "password";
+static constexpr const char * kEncoding = "encoding";
 static constexpr const char * kCamPose[] = {"cam_0_pose", "cam_1_pose", "cam_2_pose", "cam_3_pose"};
 static constexpr const char * kCamBaseFrame[] = {"cam_0_frame_id", "cam_1_frame_id",
                                                  "cam_2_frame_id", "cam_3_frame_id"};
-static constexpr const char * kCamQos[] = {"cam_0_image_qos", "cam_1_image_qos", "cam_2_image_qos", "cam_3_image_qos"};
+static constexpr const char * kCamQos[] = {"cam_0_image_qos", "cam_1_image_qos", "cam_2_image_qos",
+                                           "cam_3_image_qos"};
 static constexpr const char * kCamInfoQos[] = {"cam_0_info_qos", "cam_1_info_qos", "cam_2_info_qos",
                                                "cam_3_info_qos"};
 static constexpr const char * kQosSystemDefault = "SYSTEM_DEFAULT";
@@ -78,13 +97,6 @@ struct __attribute__((packed)) EepromData {
   uint8_t production_date[11];
 };
 
-// needed because clpe callback does not support user data :(.
-static rclcpp::Node::SharedPtr kNode;
-static std::vector<image_transport::Publisher> kImagePubs;
-static std::array<rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr, 4> kInfoPubs;
-static std::array<sensor_msgs::msg::CameraInfo, 4> kCamInfos;
-
-//==============================================================================
 template <typename ClpeClientApi>
 class ClpeNode : public rclcpp::Node
 {
@@ -95,11 +107,11 @@ public:
   static std::shared_ptr<Me> make_shared(ClpeClientApi && clpe_api)
   {
     std::shared_ptr<Me> inst(new Me(std::move(clpe_api)));
-    if (kNode) {
+    if (Me::kNode_) {
       RCLCPP_FATAL(inst->get_logger(), "only one instance allowed");
       exit(-1);
     }
-    kNode = inst->shared_from_this();
+    Me::kNode_ = static_cast<Me *>(inst->shared_from_this().get());
     return inst;
   }
 
@@ -159,33 +171,33 @@ public:
       RCLCPP_INFO(this->get_logger(), "Preparing camera for streaming");
       const auto result = this->clpe_api.Clpe_StartStream(
           [](unsigned int cam_id, unsigned char * buffer, unsigned int size,
-             struct timeval * frame_us) -> int {
+             struct timeval *) -> int {
             const auto start_time = std::chrono::steady_clock::now();
-            RCLCPP_DEBUG(kNode->get_logger(), "got new image for cam_" + std::to_string(cam_id));
+            RCLCPP_DEBUG(Me::kNode_->get_logger(),
+                         "got new image for cam_" + std::to_string(cam_id));
 
             // skip all work if there is no subscribers
             if (kImagePubs[cam_id].getNumSubscribers() == 0 &&
                 kInfoPubs[cam_id]->get_subscription_count() == 0) {
-              RCLCPP_DEBUG(kNode->get_logger(), "skipped publishing for cam_" +
-                                                    std::to_string(cam_id) +
-                                                    " because there are no subscribers");
+              RCLCPP_DEBUG(Me::kNode_->get_logger(), "skipped publishing for cam_" +
+                                                         std::to_string(cam_id) +
+                                                         " because there are no subscribers");
               return 0;
             }
 
             sensor_msgs::msg::Image image;
             const auto frame_id =
-                kNode->get_parameter(kCamBaseFrame[cam_id]).get_value<std::string>();
-            Me::FillImageMsg_(buffer, size, frame_id, image);
+                Me::kNode_->get_parameter(kCamBaseFrame[cam_id]).get_value<std::string>();
+            Me::FillImageMsg_(buffer, size, frame_id, image, Me::kNode_->encoding_);
             const auto time_after_fill = std::chrono::steady_clock::now();
             kImagePubs[cam_id].publish(image);
             kInfoPubs[cam_id]->publish(kCamInfos[cam_id]);
             const auto time_after_pub = std::chrono::steady_clock::now();
 
-            RCLCPP_DEBUG(
-              kNode->get_logger(),
-              "Time to fill msg: %ld us. Time to publish: %ld us",
-              (time_after_fill - start_time).count() / 1000,
-              (time_after_pub - time_after_fill).count() /1000);
+            RCLCPP_DEBUG(Me::kNode_->get_logger(),
+                         "Time to fill msg: %ld us. Time to publish: %ld us",
+                         (time_after_fill - start_time).count() / 1000,
+                         (time_after_pub - time_after_fill).count() / 1000);
             return 0;
           },
           1, 1, 1, 1, 0);
@@ -199,6 +211,14 @@ public:
   }
 
 private:
+  // needed because clpe callback does not support user data :(.
+  static Me * kNode_;
+  static std::vector<image_transport::Publisher> kImagePubs;
+  static std::array<rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr, 4> kInfoPubs;
+  static std::array<sensor_msgs::msg::CameraInfo, 4> kCamInfos;
+
+  std::string encoding_;
+
   explicit ClpeNode(ClpeClientApi && clpe_api) : rclcpp::Node("clpe"), clpe_api(std::move(clpe_api))
   {
     // declare ros params
@@ -212,12 +232,12 @@ private:
       rcl_interfaces::msg::ParameterDescriptor tf_desc;
       tf_desc.description =
           "Pose relative to the base, 6 values corresponding to [x, y, z, roll, pitch, yaw]";
-      this->declare_parameter(kCamPose[i], std::vector<double>({0, 0, 0, 0, 0, 0}));
+      this->declare_parameter(kCamPose[i], std::vector<double>({0, 0, 0, 0, 0, 0}), tf_desc);
 
       rcl_interfaces::msg::ParameterDescriptor base_frame_desc;
       base_frame_desc.description = "Defines the frame_id all static transformations refers to";
       base_frame_desc.read_only = true;
-      this->declare_parameter(kCamBaseFrame[i], "base_link");
+      this->declare_parameter(kCamBaseFrame[i], "base_link", base_frame_desc);
 
       rcl_interfaces::msg::ParameterDescriptor qos_desc;
       qos_desc.description =
@@ -226,7 +246,7 @@ private:
           "SENSOR_DATA, HID_DEFAULT (= DEFAULT with depth of 100), EXTRINSICS_DEFAULT (= DEFAULT "
           "with depth of 1 and transient local durability). Default is SENSOR_DATA.";
       qos_desc.read_only = true;
-      this->declare_parameter(kCamQos[i], "SENSOR_DATA");
+      this->declare_parameter(kCamQos[i], "SENSOR_DATA", qos_desc);
 
       rcl_interfaces::msg::ParameterDescriptor info_qos_desc;
       info_qos_desc.description =
@@ -235,8 +255,18 @@ private:
           "SENSOR_DATA, HID_DEFAULT (= DEFAULT with depth of 100), EXTRINSICS_DEFAULT (= DEFAULT "
           "with depth of 1 and transient local durability). Default is SYSTEM_DEFAULT.";
       info_qos_desc.read_only = true;
-      this->declare_parameter(kCamInfoQos[i], "SYSTEM_DEFAULT");
+      this->declare_parameter(kCamInfoQos[i], "SYSTEM_DEFAULT", info_qos_desc);
     }
+    {
+      rcl_interfaces::msg::ParameterDescriptor desc;
+      desc.description =
+          "Image encoding, supported formats are: bgr8, bgra8, rgb8, rgba8, mono16, yuv422. "
+          "Defaults to yuv422. Note that encodings other than yuv422 incurs conversion overhead.";
+      desc.read_only = true;
+      this->declare_parameter(kEncoding, "yuv422", desc);
+    }
+
+    this->encoding_ = this->GetEncoding_();
   }
 
   std::vector<double> GetPoseParam_(int cam_id)
@@ -272,7 +302,8 @@ private:
   {
     // reset to defaults
     cam_info = sensor_msgs::msg::CameraInfo();
-    // calibration may change anytime for self calibrating systems, so we cannot cache the cam info.
+    // calibration may change anytime for self calibrating systems, so we cannot cache the cam
+    // info.
     cam_info.width = 1920;
     cam_info.height = 1080;
     EepromData eeprom_data;
@@ -295,8 +326,8 @@ private:
     return kNoError;
   }
 
-  static void FillImageMsg_(unsigned char * buffer, unsigned int size,
-                            const std::string & frame_id, sensor_msgs::msg::Image & image)
+  static void FillImageMsg_(unsigned char * buffer, unsigned int size, const std::string & frame_id,
+                            sensor_msgs::msg::Image & image, const std::string & encoding)
   {
     image.header.frame_id = frame_id;
     // buffer is only valid for 16 frames, since ros2 publish has no real time guarantees, we must
@@ -308,7 +339,12 @@ private:
     // assume that each row is same sized.
     image.step = size / 1080;
     image.is_bigendian = false;
-    image.header.stamp = kNode->get_clock()->now();
+    image.header.stamp = Me::kNode_->get_clock()->now();
+
+    if (encoding != "yuv422") {
+      auto cv_image = cv_bridge::toCvCopy(image, encoding);
+      cv_image->toImageMsg(image);
+    }
   }
 
   std::error_code GetCameraImage_(int cam_id, sensor_msgs::msg::Image & image)
@@ -321,7 +357,8 @@ private:
       return std::error_code(result, GetFrameError::get());
     }
     this->FillImageMsg_(buffer, size,
-                        this->get_parameter(kCamBaseFrame[cam_id]).get_value<std::string>(), image);
+                        this->get_parameter(kCamBaseFrame[cam_id]).get_value<std::string>(), image,
+                        this->encoding_);
     return kNoError;
   }
 
@@ -349,6 +386,28 @@ private:
     return rclcpp::SystemDefaultsQoS();
   }
 
+  std::string GetEncoding_()
+  {
+    const auto enc = this->get_parameter(kEncoding).get_value<std::string>();
+    if (std::find(kSupportedEncodings.begin(), kSupportedEncodings.end(), enc) ==
+        kSupportedEncodings.end()) {
+      RCLCPP_FATAL(this->get_logger(), "Unsupported encoding");
+      exit(-1);
+    }
+    return enc;
+  }
+
   friend class ClpeComponentNode;
 };
+
+template <typename ClpeClientApi>
+ClpeNode<ClpeClientApi> * ClpeNode<ClpeClientApi>::kNode_;
+template <typename ClpeClientApi>
+std::vector<image_transport::Publisher> ClpeNode<ClpeClientApi>::kImagePubs;
+template <typename ClpeClientApi>
+std::array<rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr, 4>
+    ClpeNode<ClpeClientApi>::kInfoPubs;
+template <typename ClpeClientApi>
+std::array<sensor_msgs::msg::CameraInfo, 4> ClpeNode<ClpeClientApi>::kCamInfos;
+
 }  // namespace clpe
