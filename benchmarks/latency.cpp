@@ -42,8 +42,8 @@ int main(int argc, char * argv[])
     subs[i] = node.subscribe<Image>(
         "/clpe_node/cam_" + std::to_string(i) + "/image_raw", 10,
         [i, &node, &cam_sub_count, &avg_latencies](const Image::ConstPtr& image) {
-          const auto local_time = ros::Time::now().nsec;
-          const auto cam_time = image->header.stamp.nsec;
+          const auto local_time = ros::Time::now().toNSec();
+          const auto cam_time = image->header.stamp.toNSec();
           const auto diff_ns = local_time - cam_time;
           const double latency = diff_ns / 1000000.0;
           avg_latencies[i] =
