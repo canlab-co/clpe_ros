@@ -27,6 +27,7 @@
 #include <sensor_msgs/image_encodings.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <sensor_msgs/msg/image.hpp>
+#include <unordered_map>
 
 #include "errors.hpp"
 
@@ -57,6 +58,8 @@ static constexpr std::array<const char *, 6> kSupportedEncodings({
 
 static constexpr const char * kPassword = "password";
 static constexpr const char * kEncoding = "encoding";
+static constexpr const char * kCamEnable[] = {"cam_0_enable", "cam_1_enable", "cam_2_enable",
+                                              "cam_3_enable"};
 static constexpr const char * kCamPose[] = {"cam_0_pose", "cam_1_pose", "cam_2_pose", "cam_3_pose"};
 static constexpr const char * kCamBaseFrame[] = {"cam_0_frame_id", "cam_1_frame_id",
                                                  "cam_2_frame_id", "cam_3_frame_id"};
@@ -147,6 +150,11 @@ public:
     // reading eeprom is slow so the camera info is stored and reused.
     RCLCPP_INFO(this->get_logger(), "Discovering camera properties");
     for (int i = 0; i < 4; ++i) {
+      if (!this->cam_enabled_[i]) {
+        RCLCPP_INFO(this->get_logger(),
+                    "Skipped cam_" + std::to_string(i) + " because it is not enabled");
+        continue;
+      }
       const auto error = this->GetCameraInfo_(i, kCamInfos[i]);
       if (error) {
         RCLCPP_FATAL(this->get_logger(), "Failed to get camera info (" + error.message() + ")");
@@ -158,9 +166,12 @@ public:
     // create camera publishers
     kImagePubs.reserve(4);
     for (int i = 0; i < 4; ++i) {
-      kImagePubs.emplace_back(image_transport::create_publisher(
+      if (!this->cam_enabled_[i]) {
+        continue;
+      }
+      kImagePubs[i] = image_transport::create_publisher(
           this, "cam_" + std::to_string(i) + "/image_raw",
-          GetQos_(this->get_parameter(kCamQos[i]).get_value<std::string>()).get_rmw_qos_profile()));
+          GetQos_(this->get_parameter(kCamQos[i]).get_value<std::string>()).get_rmw_qos_profile());
       kInfoPubs[i] = this->create_publisher<sensor_msgs::msg::CameraInfo>(
           "cam_" + std::to_string(i) + "/camera_info",
           this->GetQos_(this->get_parameter(kCamInfoQos[i]).get_value<std::string>()));
@@ -200,7 +211,8 @@ public:
                          (time_after_pub - time_after_fill).count() / 1000);
             return 0;
           },
-          1, 1, 1, 1, 0);
+          static_cast<int>(this->cam_enabled_[0]), static_cast<int>(this->cam_enabled_[1]),
+          static_cast<int>(this->cam_enabled_[2]), static_cast<int>(this->cam_enabled_[3]), 0);
       if (result != 0) {
         const std::error_code error(result, clpe::StartStreamError::get());
         RCLCPP_FATAL(this->get_logger(), "Failed to start streaming (" + error.message() + ")");
@@ -213,11 +225,12 @@ public:
 private:
   // needed because clpe callback does not support user data :(.
   static Me * kNode_;
-  static std::vector<image_transport::Publisher> kImagePubs;
+  static std::unordered_map<int, image_transport::Publisher> kImagePubs;
   static std::array<rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr, 4> kInfoPubs;
   static std::array<sensor_msgs::msg::CameraInfo, 4> kCamInfos;
 
   std::string encoding_;
+  std::array<bool, 4> cam_enabled_;
 
   explicit ClpeNode(ClpeClientApi && clpe_api) : rclcpp::Node("clpe"), clpe_api(std::move(clpe_api))
   {
@@ -229,6 +242,10 @@ private:
       this->declare_parameter(kPassword, rclcpp::ParameterValue(), desc);
     }
     for (int i = 0; i < 4; ++i) {
+      rcl_interfaces::msg::ParameterDescriptor enable_desc;
+      enable_desc.description = "Enable camera";
+      this->declare_parameter(kCamEnable[i], true, enable_desc);
+
       rcl_interfaces::msg::ParameterDescriptor tf_desc;
       tf_desc.description =
           "Pose relative to the base, 6 values corresponding to [x, y, z, roll, pitch, yaw]";
@@ -267,6 +284,9 @@ private:
     }
 
     this->encoding_ = this->GetEncoding_();
+    for (int i = 0; i < 4; ++i) {
+      this->cam_enabled_[i] = this->get_parameter(kCamEnable[i]).get_value<bool>();
+    }
   }
 
   std::vector<double> GetPoseParam_(int cam_id)
@@ -403,7 +423,7 @@ private:
 template <typename ClpeClientApi>
 ClpeNode<ClpeClientApi> * ClpeNode<ClpeClientApi>::kNode_;
 template <typename ClpeClientApi>
-std::vector<image_transport::Publisher> ClpeNode<ClpeClientApi>::kImagePubs;
+std::unordered_map<int, image_transport::Publisher> ClpeNode<ClpeClientApi>::kImagePubs;
 template <typename ClpeClientApi>
 std::array<rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr, 4>
     ClpeNode<ClpeClientApi>::kInfoPubs;
