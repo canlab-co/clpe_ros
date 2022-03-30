@@ -20,25 +20,17 @@ enum class CalibrationModel : uint32_t {
 
 static constexpr const char * kPassword = "password";
 static constexpr const char * kCamPose[] = {"cam_0_pose", "cam_1_pose", "cam_2_pose", "cam_3_pose"};
-static constexpr const char * kCamBaseFrame[] = {"cam_0_base_frame", "cam_1_base_frame",
-                                                 "cam_2_base_frame", "cam_3_base_frame"};
-static constexpr const char * kCamQueueSize[] = {"cam_0_queue_size", "cam_1_queue_size",
-                                                 "cam_2_queue_size", "cam_3_queue_size"};
-static constexpr const char * kCamLatch[] = {"cam_0_latch", "cam_1_latch", "cam_2_latch",
-                                             "cam_3_latch"};
+static constexpr const char * kCamBaseFrame[] = {"cam_0_frame_id", "cam_1_frame_id",
+                                                 "cam_2_frame_id", "cam_3_frame_id"};
+static constexpr const char * kCamQueueSize[] = {"cam_0_image_queue_size", "cam_1_image_queue_size",
+                                                 "cam_2_image_queue_size", "cam_3_image_queue_size"};
+static constexpr const char * kCamLatch[] = {"cam_0_image_latch", "cam_1__image_latch", "cam_2_image_latch",
+                                             "cam_3_image_latch"};
 static constexpr const char * kCamInfoLatch[] = {"cam_0_info_latch", "cam_1_info_latch",
                                                  "cam_2_info_latch", "cam_3_info_latch"};
 static constexpr const char * kCamInfoQueueSize[] = {
     "cam_0_info_queue_size", "cam_1_info_queue_size", "cam_2_info_queue_size",
     "cam_3_info_queue_size"};
-static constexpr const char * kQosSystemDefault = "SYSTEM_DEFAULT";
-static constexpr const char * kQosParameterEvents = "PARAMETER_EVENTS";
-static constexpr const char * kQosServicesDefault = "SERVICES_DEFAULT";
-static constexpr const char * kQosParameters = "PARAMETERS";
-static constexpr const char * kQosDefault = "DEFAULT";
-static constexpr const char * kQosSensorData = "SENSOR_DATA";
-static constexpr const char * kQosHidDefault = "HID_DEFAULT";
-static constexpr const char * kQosExtrinsicsDefault = "EXTRINSICS_DEFAULT";
 
 // TODO: docs say 95 bytes, but reference sheet is 107 bytes
 struct __attribute__((packed)) EepromData {
