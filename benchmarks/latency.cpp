@@ -40,7 +40,7 @@ int main(int argc, char * argv[])
   using sensor_msgs::Image;
   for (int i = 0; i < cam_count; ++i) {
     subs[i] = node.subscribe<Image>(
-        "cam_" + std::to_string(i) + "/image_raw", 10,
+        "/clpe_node/cam_" + std::to_string(i) + "/image_raw", 10,
         [i, &node, &cam_sub_count, &avg_latencies](const Image::ConstPtr& image) {
           const auto local_time = ros::Time::now().nsec;
           const auto cam_time = image->header.stamp.nsec;
