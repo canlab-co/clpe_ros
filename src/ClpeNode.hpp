@@ -57,6 +57,8 @@ static constexpr std::array<const char *, 6> kSupportedEncodings({
 
 static constexpr const char * kPassword = "password";
 static constexpr const char * kEncoding = "encoding";
+static constexpr const char * kCamEnable[] = {"cam_0_enable", "cam_1_enable", "cam_2_enable",
+                                              "cam_3_enable"};
 static constexpr const char * kCamPose[] = {"cam_0_pose", "cam_1_pose", "cam_2_pose", "cam_3_pose"};
 static constexpr const char * kCamBaseFrame[] = {"cam_0_frame_id", "cam_1_frame_id",
                                                  "cam_2_frame_id", "cam_3_frame_id"};
@@ -147,6 +149,11 @@ public:
     // reading eeprom is slow so the camera info is stored and reused.
     RCLCPP_INFO(this->get_logger(), "Discovering camera properties");
     for (int i = 0; i < 4; ++i) {
+      if (!this->cam_enabled_[i]) {
+        RCLCPP_INFO(this->get_logger(),
+                     "Skipped cam_" + std::to_string(i) + " because it is not enabled");
+        continue;
+      }
       const auto error = this->GetCameraInfo_(i, kCamInfos[i]);
       if (error) {
         RCLCPP_FATAL(this->get_logger(), "Failed to get camera info (" + error.message() + ")");
@@ -200,7 +207,8 @@ public:
                          (time_after_pub - time_after_fill).count() / 1000);
             return 0;
           },
-          1, 1, 1, 1, 0);
+          static_cast<int>(this->cam_enabled_[0]), static_cast<int>(this->cam_enabled_[1]),
+          static_cast<int>(this->cam_enabled_[2]), static_cast<int>(this->cam_enabled_[3]), 0);
       if (result != 0) {
         const std::error_code error(result, clpe::StartStreamError::get());
         RCLCPP_FATAL(this->get_logger(), "Failed to start streaming (" + error.message() + ")");
@@ -218,6 +226,7 @@ private:
   static std::array<sensor_msgs::msg::CameraInfo, 4> kCamInfos;
 
   std::string encoding_;
+  std::array<bool, 4> cam_enabled_;
 
   explicit ClpeNode(ClpeClientApi && clpe_api) : rclcpp::Node("clpe"), clpe_api(std::move(clpe_api))
   {
@@ -229,6 +238,10 @@ private:
       this->declare_parameter(kPassword, rclcpp::ParameterValue(), desc);
     }
     for (int i = 0; i < 4; ++i) {
+      rcl_interfaces::msg::ParameterDescriptor enable_desc;
+      enable_desc.description = "Enable camera";
+      this->declare_parameter(kCamEnable[i], true, enable_desc);
+
       rcl_interfaces::msg::ParameterDescriptor tf_desc;
       tf_desc.description =
           "Pose relative to the base, 6 values corresponding to [x, y, z, roll, pitch, yaw]";
@@ -267,6 +280,9 @@ private:
     }
 
     this->encoding_ = this->GetEncoding_();
+    for (int i = 0; i < 4; ++i) {
+      this->cam_enabled_[i] = this->get_parameter(kCamEnable[i]).get_value<bool>();
+    }
   }
 
   std::vector<double> GetPoseParam_(int cam_id)
