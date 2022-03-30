@@ -3,14 +3,14 @@
   <arg name="namespace" default=""/>
   <arg name="password" default=""/>
   <arg name="encoding" default="yuv422"/>
-
+  <arg name="config" default="(find clpe_ros)/config/clpe_config.yaml"/>
 
   <group ns="$(arg namespace)">
     <node name="clpe_ros" pkg="clpe_ros" type="clpe_ros" output="screen">
       <param name="password" value="$(arg password)"/>
       <param name="encoding" value="$(arg encoding)"/>
       <rosparam command="load"
-                file="$(find clpe_ros)/config/clpe_config.yaml" />
+                file="$(arg config)" />
     </node>
   </group>
 
