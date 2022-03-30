@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cv_bridge/cv_bridge.h>
 #include <geometry_msgs/Transform.h>
 #include <image_transport/image_transport.h>
 #include <ros/ros.h>
@@ -18,7 +19,24 @@ enum class CalibrationModel : uint32_t {
   FishEye = 1,
 };
 
+// Supported types by cv_bridge
+// https://github.com/ros-perception/vision_opencv/blob/c791220cefd0abf02c6719e2ce0fea465857a88e/cv_bridge/include/cv_bridge/cv_bridge.h#L202
+// using array instead of enum to allow iteration.
+static constexpr std::array<const char *, 6> kSupportedEncodings({
+    // cv_bridge only supports converting to from color to mono of the same channels, so "mono8"
+    // is not supported.
+    // "mono8"
+    "bgr8",
+    "bgra8",
+    "rgb8",
+    "rgba8",
+    "mono16",
+    // camera encoding
+    "yuv422",
+});
+
 static constexpr const char * kPassword = "password";
+static constexpr const char * kEncoding = "encoding";
 static constexpr const char * kCamPose[] = {"cam_0_pose", "cam_1_pose", "cam_2_pose", "cam_3_pose"};
 static constexpr const char * kCamBaseFrame[] = {"cam_0_base_frame", "cam_1_base_frame",
                                                  "cam_2_base_frame", "cam_3_base_frame"};
@@ -64,12 +82,6 @@ struct __attribute__((packed)) EepromData {
   uint8_t production_date[11];
 };
 
-// needed because clpe callback does not support user data :(.
-static ros::NodeHandle * kNode;
-static std::vector<image_transport::Publisher> kImagePubs;
-static std::array<ros::Publisher, 4> kInfoPubs;
-static std::array<sensor_msgs::CameraInfo, 4> kCamInfos;
-
 template <typename ClpeClientApi>
 class ClpeNode : public ros::NodeHandle,
                  public std::enable_shared_from_this<ClpeNode<ClpeClientApi>>
@@ -82,11 +94,11 @@ public:
   {
     std::shared_ptr<Me> inst(new Me(std::move(clpe_api)));
     inst->transport_ = std::make_unique<image_transport::ImageTransport>(*inst->shared_from_this());
-    if (kNode) {
+    if (Me::kNode_) {
       ROS_FATAL("only one instance allowed");
       exit(-1);
     }
-    kNode = inst->shared_from_this().get();
+    Me::kNode_ = inst->shared_from_this().get();
     return inst;
   }
 
@@ -159,8 +171,9 @@ public:
             }
 
             sensor_msgs::Image image;
-            const auto frame_id = kNode->param<std::string>(kCamBaseFrame[cam_id], "base_link");
-            Me::FillImageMsg_(buffer, size, *frame_us, frame_id, image);
+            const auto frame_id =
+                Me::kNode_->param<std::string>(kCamBaseFrame[cam_id], "base_link");
+            Me::FillImageMsg_(buffer, size, *frame_us, frame_id, image, Me::kNode_->encoding_);
             kImagePubs[cam_id].publish(image);
             kInfoPubs[cam_id].publish(kCamInfos[cam_id]);
             return 0;
@@ -176,10 +189,18 @@ public:
   }
 
 private:
+  // needed because clpe callback does not support user data :(.
+  static Me * kNode_;
+  static std::vector<image_transport::Publisher> kImagePubs;
+  static std::array<ros::Publisher, 4> kInfoPubs;
+  static std::array<sensor_msgs::CameraInfo, 4> kCamInfos;
+
   std::unique_ptr<image_transport::ImageTransport> transport_;
+  std::string encoding_;
 
   explicit ClpeNode(ClpeClientApi && clpe_api) : ros::NodeHandle("~"), clpe_api(std::move(clpe_api))
   {
+    this->encoding_ = this->GetEncoding_();
   }
 
   std::vector<double> GetPoseParam_(int cam_id)
@@ -240,11 +261,13 @@ private:
   }
 
   static void FillImageMsg_(unsigned char * buffer, unsigned int size, const timeval & timestamp,
-                            const std::string & frame_id, sensor_msgs::Image & image)
+                            const std::string & frame_id, sensor_msgs::Image & image,
+                            const std::string & encoding)
   {
     image.header.frame_id = frame_id;
     image.header.stamp.sec = timestamp.tv_sec;
     image.header.stamp.nsec = timestamp.tv_usec * 1000;
+
     // buffer is only valid for 16 frames, since ros2 publish has no real time guarantees, we must
     // copy the data out to avoid UB.
     image.data = std::vector<uint8_t>(buffer, buffer + size);
@@ -254,6 +277,11 @@ private:
     // assume that each row is same sized.
     image.step = size / 1080;
     image.is_bigendian = false;
+
+    if (encoding != "yuv422") {
+      auto cv_image = cv_bridge::toCvCopy(image, encoding);
+      cv_image->toImageMsg(image);
+    }
   }
 
   std::error_code GetCameraImage_(int cam_id, sensor_msgs::Image & image)
@@ -266,10 +294,32 @@ private:
       return std::error_code(result, GetFrameError::get());
     }
     this->FillImageMsg_(buffer, size, timestamp,
-                        this->param<std::string>(kCamBaseFrame[cam_id], "base_link"), image);
+                        this->param<std::string>(kCamBaseFrame[cam_id], "base_link"), image,
+                        this->encoding_);
     return kNoError;
+  }
+
+  std::string GetEncoding_()
+  {
+    const auto enc = this->param<std::string>(kEncoding, "yuv422");
+    if (std::find(kSupportedEncodings.begin(), kSupportedEncodings.end(), enc) ==
+        kSupportedEncodings.end()) {
+      ROS_FATAL("Unsupported encoding");
+      exit(-1);
+    }
+    return enc;
   }
 
   friend class ClpeComponentNode;
 };
+
+template <typename ClpeClientApi>
+ClpeNode<ClpeClientApi> * ClpeNode<ClpeClientApi>::kNode_;
+template <typename ClpeClientApi>
+std::vector<image_transport::Publisher> ClpeNode<ClpeClientApi>::kImagePubs;
+template <typename ClpeClientApi>
+std::array<ros::Publisher, 4> ClpeNode<ClpeClientApi>::kInfoPubs;
+template <typename ClpeClientApi>
+std::array<sensor_msgs::CameraInfo, 4> ClpeNode<ClpeClientApi>::kCamInfos;
+
 }  // namespace clpe

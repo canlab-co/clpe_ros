@@ -5,4 +5,6 @@ pkg_search_module(gstreamer_app gstreamer-app-1.0 REQUIRED)
 
 add_library(clpe INTERFACE)
 target_include_directories(clpe INTERFACE libclpe/include)
-target_link_libraries(clpe INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/libclpe/lib/libclpe.a)
+target_link_libraries(clpe INTERFACE
+  ${CMAKE_CURRENT_SOURCE_DIR}/libclpe/lib/libclpe.a
+  ${gstreamer_app_LIBRARIES})
