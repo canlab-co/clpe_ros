@@ -10,6 +10,8 @@
 #include <sensor_msgs/image_encodings.h>
 #include <tf2/LinearMath/Quaternion.h>
 
+#include <unordered_map>
+
 #include "errors.hpp"
 
 namespace clpe
@@ -156,8 +158,8 @@ public:
       }
       bool latch = this->param<bool>(kCamLatch[i], false);
       int queue_size = this->param<int>(kCamQueueSize[i], 10);
-      kImagePubs.emplace_back(this->transport_->advertise("cam_" + std::to_string(i) + "/image_raw",
-                                                          queue_size, latch));
+      kImagePubs[i] =
+          this->transport_->advertise("cam_" + std::to_string(i) + "/image_raw", queue_size, latch);
       bool info_latch = this->param<bool>(kCamInfoLatch[i], false);
       bool info_queue_size = this->param<int>(kCamInfoQueueSize[i], 10);
       kInfoPubs[i] = this->advertise<sensor_msgs::CameraInfo>(
@@ -201,7 +203,7 @@ public:
 private:
   // needed because clpe callback does not support user data :(.
   static Me * kNode_;
-  static std::vector<image_transport::Publisher> kImagePubs;
+  static std::unordered_map<int, image_transport::Publisher> kImagePubs;
   static std::array<ros::Publisher, 4> kInfoPubs;
   static std::array<sensor_msgs::CameraInfo, 4> kCamInfos;
 
@@ -330,7 +332,7 @@ private:
 template <typename ClpeClientApi>
 ClpeNode<ClpeClientApi> * ClpeNode<ClpeClientApi>::kNode_;
 template <typename ClpeClientApi>
-std::vector<image_transport::Publisher> ClpeNode<ClpeClientApi>::kImagePubs;
+std::unordered_map<int, image_transport::Publisher> ClpeNode<ClpeClientApi>::kImagePubs;
 template <typename ClpeClientApi>
 std::array<ros::Publisher, 4> ClpeNode<ClpeClientApi>::kInfoPubs;
 template <typename ClpeClientApi>
