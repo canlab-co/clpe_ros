@@ -62,7 +62,7 @@ source install_isolated/setup.bash
 roslaunch clpe_ros clpe_ros.launch password:=<sudo-password> encoding:=yuv422
 ```
 
-> Note: If `sudo_password` is a number, say `42`, you should pass it as `password:=\'42\'`
+> Note: If `sudo-password` is a number, say `42`, you should pass it as `password:=\'42\'`
 
 By default the driver will publish two topics per camera (X).
 * /clpe_ros/cam_X/image_raw: The raw image published as `sensor_msgs::Image`. The default encoding is `yuv422`. For other supported encodings, see Configuration below.
