@@ -1,24 +1,80 @@
 # About
 
-<!-- FIXME: Confirm product description? -->
-This is the ROS driver for CANLAB CLPE-G-NVP2650D. CLPE-G-NVP2650D is a multi camera grabber board for N2.0 GMSL camera. This drivers exposes camera images and information from CLPE-G-NVP2650D as ROS messages using the image_transport framework.
+This repository contains ROS 1 and ROS 2 drivers for the CANLAB CLPE-G-NVP2650D system.
+CLPE-G-NVP2650D is a multi camera grabber board for N2.0 GMSL camera.
+This drivers exposes camera images and information from CLPE-G-NVP2650D as ROS messages using the image_transport framework.
 
-# Running
+**This branch contains the `ROS 2` driver. For the `ROS 1` driver, please switch to the `noetic` branch.**
+
+# System Requirements
 
 Requirements:
-  * CANLAB CLPE-G-NVP2650D supplied PC
-  * ROS2 foxy
+  * CANLAB CLPE-G-NVP2650D with supplied PC running [Ubuntu 20.04](https://releases.ubuntu.com/20.04/)
+  * [ROS 2 Foxy](https://docs.ros.org/en/foxy/index.html) or [ROS 2 Galactic](https://docs.ros.org/en/galactic/index.html)
 
-The PC that comes with CLPE-G-NVP2650D should already contain a suitable ROS2 distro. If it is not available, ROS2 foxy needs to be built from source as the default OS of the PC is not supported. See https://docs.ros.org/en/foxy/Installation/Ubuntu-Development-Setup.html for instructions. Alternatively, containers or VM may be used but the CLPE-G-NVP2650D drivers has to be properly passthroughed.
+> Note: It is strongly recommended to install `Ubuntu 20.04` on the PC shipped with CLPE-G-NVP2650D. This way ROS 2 binaries can be [installed as debian packages](https://docs.ros.org/en/foxy/Installation/Ubuntu-Install-Debians.html). If the PC is running `Ubuntu 18.04`, ROS 2 will need to be [built from source](https://docs.ros.org/en/foxy/Installation/Ubuntu-Development-Setup.html) which is not officially supported on `Ubuntu 18.04`.
+Alternatively, containers or VM may be used but the CLPE-G-NVP2650D drivers has to be properly passed through.
+
+
+# Setup
+
+## System dependencies
+```bash
+sudo apt update && sudo apt install git cmake python3-colcon* python3-rosdep -y
+```
+
+## ROS 2 Installation
+Depending on the version of Ubuntu installed, follow the instructions in the links above to install ROS 2 binaries or from source.
+To source ROS 2
+```bash
+source /opt/ros/foxy/setup.bash # if binaries are installed
+source ~/ros2_foxy/install/setup.bash # if installed from source following link above
+```
+> Note: Replace `foxy` with `galactic` if using ROS 2 Galactic
+
+## Install ROS 2 Driver
+Create workspace
+```bash
+mkdir -p ~/ws_clpe/src
+cd ~/ws_clpe/src
+git clone https://github.com/osrf/canlab
+```
+
+Install dependencies
 
 ```bash
-source /opt/ros/foxy/setup.bash
-ros2 launch clpe_ros clpe_ros.launch.py password:=<sudo-password>
+cd ~/ws_clpe
+# source your ROS 2 workspace before this command
+sudo rosdep init # if you have not done this before
+rosdep update
+rosdep install --from-paths src --ignore-src --rosdistro $ROS_DISTRO -y
 ```
+
+Build the driver
+
+```bash
+cd ~/ws_clpe
+# source your ROS 2 workspace if you have not already
+colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
+```
+
+# Run the driver
+
+```bash
+cd ~/ws_clpe
+source install/setup.bash
+ros2 launch clpe_ros clpe_ros.launch.py password:=<sudo-password> encoding:=yuv422
+```
+
+> Note: If `sudo_password` is a number, say `42`, you should pass it as `password:=\'42\'`
+
+By default the driver will publish two topics per camera (X).
+* /clpe/cam_X/image_raw: The raw image published as `sensor_msgs::msg::Image`. The default encoding is `yuv422`. For other supported encodings, see Configuration below.
+* /clpe/cam_X/camera_info: The intrinsics of the camera published as a `sensor_msgs::msg::CameraInfo` message.
 
 # Configuration
 
-The driver supports the following ros parameters to configure it's behavior.
+The driver supports the following ROS parameters to configure its behavior. The `password` and `encoding` parameters can be overwritten at run time. Other parameters can be modified within the [launch file](launch/clpe_ros.launch.py).
 
 | Key | Description | Default |
 |-|-|-|
@@ -31,41 +87,3 @@ The driver supports the following ros parameters to configure it's behavior.
 | cam_{n}_info_qos | Sets the QoS by which the topic is published. Available values are the following strings: SYSTEM_DEFAULT, PARAMETER_EVENTS, SERVICES_DEFAULT, PARAMETERS, DEFAULT, SENSOR_DATA, HID_DEFAULT (= DEFAULT with depth of 100), EXTRINSICS_DEFAULT (= DEFAULT with depth of 1 and transient local durabilty). | SYSTEM_DEFAULT |
 
 Unless specified otherwise, all parameters are read-only, that is, they must be initialized at startup and cannot be changed at runtime.
-
-# Building
-
-## Requirements
-
-* CANLAB CLPE-G-NVP2650D supplied PC
-* ROS2 foxy
-* rosdep
-* colcon
-* git
-
-The PC that comes with CLPE-G-NVP2650D should already contain a suitable ROS2 distro. If it is not available, ROS2 foxy needs to be built from source as the default OS of the PC is not supported. See https://docs.ros.org/en/foxy/Installation/Ubuntu-Development-Setup.html for instructions. Alternatively, containers or VM may be used but the CLPE-G-NVP2650D drivers has to be properly passthroughed.
-
-## Building
-
-```bash
-mkdir -p <workspace>/src
-cd <workspace>/src
-```
-
-Obtain sources
-
-```bash
-git clone https://github.com/osrf/canlab
-```
-
-Install dependencies
-
-```bash
-cd <workspace>
-rosdep install --from-paths src -i
-```
-
-Compile
-
-```bash
-colcon build --cmake-args -DCMAKE_BUILD_TYPE=DEBUG --packages-up-to clpe_ros
-```
