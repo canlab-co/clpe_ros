@@ -4,7 +4,7 @@ This repository contains ROS 1 and ROS 2 drivers for the CANLAB CLPE-G-NVP2650D 
 CLPE-G-NVP2650D is a multi camera grabber board for N2.0 GMSL camera.
 This drivers exposes camera images and information from CLPE-G-NVP2650D as ROS messages using the image_transport framework.
 
-This branch contains the `ROS 2` driver. For the `ROS 1` driver, please switch to the `noetic` branch.
+**This branch contains the `ROS 2` driver. For the `ROS 1` driver, please switch to the `noetic` branch.**
 
 # System Requirements
 
@@ -20,8 +20,7 @@ Alternatively, containers or VM may be used but the CLPE-G-NVP2650D drivers has 
 
 ## System dependencies
 ```bash
-sudo apt update && sudo apt install git cmake python3-colcon* -y
-sudo apt install python3-rosdep
+sudo apt update && sudo apt install git cmake python3-colcon* python3-rosdep -y
 ```
 
 ## ROS 2 Installation
@@ -31,6 +30,7 @@ To source ROS 2
 source /opt/ros/foxy/setup.bash # if binaries are installed
 source ~/ros2_foxy/install/setup.bash # if installed from source following link above
 ```
+> Note: Replace `foxy` with `galactic` if using ROS 2 Galactic
 
 ## Install ROS 2 Driver
 Create workspace
@@ -63,7 +63,7 @@ colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
 ```bash
 cd ~/ws_clpe
 source install/setup.bash
-ros2 launch clpe_ros clpe_ros.launch.py password:=<sudo-password>
+ros2 launch clpe_ros clpe_ros.launch.py password:=<sudo-password> encoding:=yuv422
 ```
 
 > Note: If `sudo_password` is a number, say `42`, you should pass it as `password:=\'42\'`
@@ -74,7 +74,7 @@ By default the driver will publish two topics per camera (X).
 
 # Configuration
 
-The driver supports the following ros parameters to configure it's behavior.
+The driver supports the following ROS parameters to configure its behavior. The `password` and `encoding` parameters can be overwritten at run time. Other parameters can be modified within the [launch file](launch/clpe_ros.launch.py).
 
 | Key | Description | Default |
 |-|-|-|
