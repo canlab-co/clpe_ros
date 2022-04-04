@@ -268,14 +268,11 @@ private:
     return kNoError;
   }
 
-  static void FillImageMsg_(unsigned char * buffer, unsigned int size, const timeval & timestamp,
+  static void FillImageMsg_(unsigned char * buffer, unsigned int size, const timeval & /*timestamp*/,
                             const std::string & frame_id, sensor_msgs::Image & image,
                             const std::string & encoding)
   {
     image.header.frame_id = frame_id;
-    image.header.stamp.sec = timestamp.tv_sec;
-    image.header.stamp.nsec = timestamp.tv_usec * 1000;
-
     // buffer is only valid for 16 frames, since ros2 publish has no real time guarantees, we must
     // copy the data out to avoid UB.
     image.data = std::vector<uint8_t>(buffer, buffer + size);
@@ -290,6 +287,7 @@ private:
       auto cv_image = cv_bridge::toCvCopy(image, encoding);
       cv_image->toImageMsg(image);
     }
+    image.header.stamp = ros::Time::now();
   }
 
   std::error_code GetCameraImage_(int cam_id, sensor_msgs::Image & image)
