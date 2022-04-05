@@ -6,13 +6,13 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
+find_package(clpe REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
-# TODO: find_package when clpe supports cmake
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/clpe.cmake)
+find_package(tf2 REQUIRED)
 
 add_library(${PROJECT_NAME}_lib INTERFACE)
 target_include_directories(${PROJECT_NAME}_lib INTERFACE
@@ -21,7 +21,7 @@ target_include_directories(${PROJECT_NAME}_lib INTERFACE
   ${image_transport_INCLUDE_DIRS}
   ${cv_bridge_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME}_lib INTERFACE
-  clpe
+  clpe::clpe
   rclcpp::rclcpp
   ${geometry_msgs_LIBRARIES}
   ${sensor_msgs_LIBRARIES}

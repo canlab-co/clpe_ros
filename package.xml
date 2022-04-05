@@ -9,11 +9,13 @@
   <license>Unspecified</license>
   <author>Teo Koon Peng</author>
 
+  <depend>clpe</depend>
   <depend>rclcpp</depend>
   <depend>image_transport</depend>
   <depend>geometry_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>cv_bridge</depend>
+  <depend>tf2</depend>
 
   <build_depend>ament_cmake</build_depend>
   <buildtool_depend>python3-colcon-common-extensions</buildtool_depend>
