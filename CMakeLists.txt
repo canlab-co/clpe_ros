@@ -1,14 +1,18 @@
 cmake_minimum_required(VERSION 3.16)
 project(clpe_ros)
 
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
 find_package(catkin REQUIRED)
+find_package(clpe REQUIRED)
 find_package(roscpp REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
-# TODO: find_package when clpe supports cmake
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/clpe.cmake)
+find_package(tf2 REQUIRED)
 
 catkin_package(DEPENDS roscpp image_transport)
 

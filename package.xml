@@ -9,11 +9,13 @@
   <license>Unspecified</license>
   <author>Teo Koon Peng</author>
 
+  <depend>clpe</depend>
   <depend>roscpp</depend>
   <depend>image_transport</depend>
   <depend>geometry_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>cv_bridge</depend>
+  <depend>tf2</depend>
 
   <buildtool_depend>catkin</buildtool_depend>
 </package>
