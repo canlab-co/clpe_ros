@@ -199,7 +199,7 @@ public:
             sensor_msgs::msg::Image image;
             const auto frame_id =
                 Me::kNode_->get_parameter(kCamBaseFrame[cam_id]).get_value<std::string>();
-            const rclcpp::Time stamp = Me::kNode->get_clock()->now();
+            const rclcpp::Time stamp = Me::kNode_->get_clock()->now();
             Me::FillImageMsg_(buffer, size, stamp, frame_id, image, Me::kNode_->encoding_);
             const auto time_after_fill = std::chrono::steady_clock::now();
             kImagePubs[cam_id].publish(image);
@@ -378,7 +378,7 @@ private:
     if (result != 0) {
       return std::error_code(result, GetFrameError::get());
     }
-    this->FillImageMsg_(buffer, size,
+    this->FillImageMsg_(buffer, size, Me::kNode->get_clock()->now(),
                         this->get_parameter(kCamBaseFrame[cam_id]).get_value<std::string>(), image,
                         this->encoding_);
     return kNoError;
