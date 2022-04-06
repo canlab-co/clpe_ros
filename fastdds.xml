@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+    
+    <transport_descriptors>
+
+        <!-- We still want the default UDP transport to be present -->
+        <transport_descriptor>
+            <transport_id>udp_transport</transport_id>
+            <type>UDPv4</type>
+        </transport_descriptor>
+    
+        <!-- We want a customized version of the SHM transport -->
+        <transport_descriptor>
+            <transport_id>shm_transport</transport_id>
+            <type>SHM</type>
+            
+            <!--
+                Configure the size in bytes of the shared memory segment.
+                On a Linux based system, you can get the maximum allowed value with
+                    $ sysctl -a | grep shmmax
+            -->
+            <segment_size>5242880</segment_size>
+            
+            <!--
+                The following value should be lower than or equal to segment_size.
+                The default value is shown here.
+            -->
+            <maxMessageSize>5242880</maxMessageSize>
+        </transport_descriptor>
+
+    </transport_descriptors>
+
+    <participant profile_name="CustomParticipant"  is_default_profile="true">
+        <rtps>
+            <!--
+                As customized versions of the default transports are used, the
+                built-in ones should be disabled
+            -->
+            <useBuiltinTransports>false</useBuiltinTransports>
+
+            <!-- Link the Transport Layer to the Participant -->
+            <userTransports>
+                <transport_id>udp_transport</transport_id>
+
+                <!-- Comment the following line in order to disable the SHM transport -->
+                <transport_id>shm_transport</transport_id>
+            </userTransports>
+        </rtps>
+    </participant>
+</profiles>
