@@ -301,7 +301,7 @@ private:
     if (result != 0) {
       return std::error_code(result, GetFrameError::get());
     }
-    this->FillImageMsg_(buffer, size, timestamp,
+    this->FillImageMsg_(buffer, size, ros::Time::now(),
                         this->param<std::string>(kCamBaseFrame[cam_id], "base_link"), image,
                         this->encoding_);
     return kNoError;
