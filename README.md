@@ -51,14 +51,14 @@ Build the driver
 ```bash
 cd ~/ws_clpe
 # source your ROS 1 workspace if you have not already
-catkin_make_isolated --install -DCMAKE_BUILD_TYPE=Release
+catkin_make install --cmake-args -DCMAKE_BUILD_TYPE=Release
 ```
 
 # Run the driver
 
 ```bash
 cd ~/ws_clpe
-source install_isolated/setup.bash
+source install/setup.bash
 roslaunch clpe_ros clpe_ros.launch password:=<sudo-password> encoding:=yuv422
 ```
 
