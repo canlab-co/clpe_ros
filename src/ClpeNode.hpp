@@ -176,8 +176,10 @@ public:
             sensor_msgs::Image image;
             const auto frame_id =
                 Me::kNode_->param<std::string>(kCamBaseFrame[cam_id], "base_link");
-            Me::FillImageMsg_(buffer, size, *frame_us, frame_id, image, Me::kNode_->encoding_);
+            const ros::Time stamp = ros::Time::now();
+            Me::FillImageMsg_(buffer, size, stamp, frame_id, image, Me::kNode_->encoding_);
             kImagePubs[cam_id].publish(image);
+            kCamInfos[cam_id].header.stamp = stamp;
             kInfoPubs[cam_id].publish(kCamInfos[cam_id]);
             return 0;
           },
@@ -268,7 +270,7 @@ private:
     return kNoError;
   }
 
-  static void FillImageMsg_(unsigned char * buffer, unsigned int size, const timeval & /*timestamp*/,
+  static void FillImageMsg_(unsigned char * buffer, unsigned int size, const ros::Time & stamp,
                             const std::string & frame_id, sensor_msgs::Image & image,
                             const std::string & encoding)
   {
@@ -282,12 +284,12 @@ private:
     // assume that each row is same sized.
     image.step = size / 1080;
     image.is_bigendian = false;
+    image.header.stamp = stamp;
 
     if (encoding != "yuv422") {
       auto cv_image = cv_bridge::toCvCopy(image, encoding);
       cv_image->toImageMsg(image);
     }
-    image.header.stamp = ros::Time::now();
   }
 
   std::error_code GetCameraImage_(int cam_id, sensor_msgs::Image & image)
