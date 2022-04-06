@@ -199,9 +199,11 @@ public:
             sensor_msgs::msg::Image image;
             const auto frame_id =
                 Me::kNode_->get_parameter(kCamBaseFrame[cam_id]).get_value<std::string>();
-            Me::FillImageMsg_(buffer, size, frame_id, image, Me::kNode_->encoding_);
+            const rclcpp::Time stamp = Me::kNode->get_clock()->now();
+            Me::FillImageMsg_(buffer, size, stamp, frame_id, image, Me::kNode_->encoding_);
             const auto time_after_fill = std::chrono::steady_clock::now();
             kImagePubs[cam_id].publish(image);
+            kCamInfos[cam_id].header.stamp = stamp;
             kInfoPubs[cam_id]->publish(kCamInfos[cam_id]);
             const auto time_after_pub = std::chrono::steady_clock::now();
 
@@ -346,7 +348,7 @@ private:
     return kNoError;
   }
 
-  static void FillImageMsg_(unsigned char * buffer, unsigned int size, const std::string & frame_id,
+  static void FillImageMsg_(unsigned char * buffer, unsigned int size, const rclcpp::Time & stamp, const std::string & frame_id,
                             sensor_msgs::msg::Image & image, const std::string & encoding)
   {
     image.header.frame_id = frame_id;
@@ -359,7 +361,7 @@ private:
     // assume that each row is same sized.
     image.step = size / 1080;
     image.is_bigendian = false;
-    image.header.stamp = Me::kNode_->get_clock()->now();
+    image.header.stamp = stamp;
 
     if (encoding != "yuv422") {
       auto cv_image = cv_bridge::toCvCopy(image, encoding);
