@@ -60,6 +60,24 @@ colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
 
 # Run the driver
 
+## DDS Configuration
+For better image transport performance over DDS, we recommend using [FastDDS](https://github.com/eProsima/Fast-DDS) with Shared Memory Transport enabled.
+First copy the the `fastdds.xml` config file to a suitable directory, eg. `$HOME/fastdds.xml`
+```bash
+cd ~/ws_clpe/src
+cp canlab/fastdds.xml ~/
+```
+
+Next add these two lines to your `~/.bashrc`
+```bash
+export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+export FASTRTPS_DEFAULT_PROFILES_FILE=$HOME/fastdds.xml
+```
+
+Make sure to `source ~/.bashrc` first on all terminals before launching any ROS 2 nodes including the driver.
+
+## Launch
+
 ```bash
 cd ~/ws_clpe
 source install/setup.bash
