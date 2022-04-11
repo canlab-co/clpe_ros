@@ -10,6 +10,7 @@ This drivers exposes camera images and information from CLPE-G-NVP2650D as ROS m
 
 Requirements:
   * CANLAB CLPE-G-NVP2650D with supplied PC running [Ubuntu 20.04](https://releases.ubuntu.com/20.04/)
+  * [CLPE_G_NVP2650D_SDK](https://github.com/canlab-co/CLPE_G_NVP2650D_SDK)
   * [ROS 1 Noetic](http://wiki.ros.org/noetic)
 
 > Note: It is strongly recommended to install `Ubuntu 20.04` on the PC shipped with CLPE-G-NVP2650D. This way ROS 1 binaries can be [installed as debian packages](http://wiki.ros.org/noetic/Installation/Ubuntu). If the PC is running `Ubuntu 18.04`, ROS 1 will need to be [built from source](http://wiki.ros.org/noetic/Installation/Source) which is not officially supported on `Ubuntu 18.04`.
@@ -30,12 +31,13 @@ source /opt/ros/noetic/setup.bash # if binaries are installed
 source ~/ros1_noetic/install/setup.bash # if installed from source following link above
 ```
 
-## Install ROS 1 Driver
+## Install CLPE SDK and ROS 1 Driver
 Create workspace
 ```bash
 mkdir -p ~/ws_clpe/src
 cd ~/ws_clpe/src
-git clone https://github.com/osrf/canlab -b noetic
+git clone https://github.com/canlab-co/CLPE_G_NVP2650D_SDK #CLPE SDK
+git clone https://github.com/osrf/canlab -b noetic # ROS driver
 ```
 
 Install dependencies
@@ -52,6 +54,8 @@ Build the driver
 cd ~/ws_clpe
 # source your ROS 1 workspace if you have not already
 catkin_make install --cmake-args -DCMAKE_BUILD_TYPE=Release
+# To also build the benchmarking scripts
+catkin_make install --cmake-args -DCMAKE_BUILD_TYPE=Release -DCLPE_ROS_BUILD_BENCHMARKS=On
 ```
 
 # Run the driver
