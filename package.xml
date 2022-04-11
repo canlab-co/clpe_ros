@@ -5,8 +5,7 @@
   <version>0.1.0</version>
   <description>ROS driver for CANLAB CLPE-G-NVP2650D</description>
   <maintainer email="none@none.com">None</maintainer>
-  <!-- <license>Apache License 2.0</license> -->
-  <license>Unspecified</license>
+  <license>Apache License 2.0</license>
   <author>Teo Koon Peng</author>
 
   <depend>clpe</depend>
