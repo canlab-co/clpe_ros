@@ -10,6 +10,7 @@ This drivers exposes camera images and information from CLPE-G-NVP2650D as ROS m
 
 Requirements:
   * CANLAB CLPE-G-NVP2650D with supplied PC running [Ubuntu 20.04](https://releases.ubuntu.com/20.04/)
+  * [CLPE_G_NVP2650D_SDK](https://github.com/canlab-co/CLPE_G_NVP2650D_SDK)
   * [ROS 2 Foxy](https://docs.ros.org/en/foxy/index.html) or [ROS 2 Galactic](https://docs.ros.org/en/galactic/index.html)
 
 > Note: It is strongly recommended to install `Ubuntu 20.04` on the PC shipped with CLPE-G-NVP2650D. This way ROS 2 binaries can be [installed as debian packages](https://docs.ros.org/en/foxy/Installation/Ubuntu-Install-Debians.html). If the PC is running `Ubuntu 18.04`, ROS 2 will need to be [built from source](https://docs.ros.org/en/foxy/Installation/Ubuntu-Development-Setup.html) which is not officially supported on `Ubuntu 18.04`.
@@ -32,12 +33,13 @@ source ~/ros2_foxy/install/setup.bash # if installed from source following link 
 ```
 > Note: Replace `foxy` with `galactic` if using ROS 2 Galactic
 
-## Install ROS 2 Driver
+## Install CLPE SDK and ROS 2 Driver
 Create workspace
 ```bash
 mkdir -p ~/ws_clpe/src
 cd ~/ws_clpe/src
-git clone https://github.com/osrf/canlab
+git clone https://github.com/canlab-co/CLPE_G_NVP2650D_SDK #CLPE SDK
+git clone https://github.com/osrf/canlab # ROS driver
 ```
 
 Install dependencies
@@ -56,6 +58,8 @@ Build the driver
 cd ~/ws_clpe
 # source your ROS 2 workspace if you have not already
 colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
+# To also build the benchmarking scripts
+colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release -DCLPE_ROS_BUILD_BENCHMARKS=On
 ```
 
 # Run the driver
