@@ -107,9 +107,10 @@ private:
   using Me = ClpeNode<ClpeClientApi>;
 
 public:
-  static std::shared_ptr<Me> make_shared(ClpeClientApi && clpe_api)
+  static std::shared_ptr<Me> make_shared(
+      ClpeClientApi && clpe_api, const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
   {
-    std::shared_ptr<Me> inst(new Me(std::move(clpe_api)));
+    std::shared_ptr<Me> inst(new Me(std::move(clpe_api), options));
     if (Me::kNode_) {
       RCLCPP_FATAL(inst->get_logger(), "only one instance allowed");
       exit(-1);
@@ -234,7 +235,8 @@ private:
   std::string encoding_;
   std::array<bool, 4> cam_enabled_;
 
-  explicit ClpeNode(ClpeClientApi && clpe_api) : rclcpp::Node("clpe"), clpe_api(std::move(clpe_api))
+  explicit ClpeNode(ClpeClientApi && clpe_api, const rclcpp::NodeOptions & options)
+      : rclcpp::Node("clpe", options), clpe_api(std::move(clpe_api))
   {
     // declare ros params
     {
@@ -348,8 +350,9 @@ private:
     return kNoError;
   }
 
-  static void FillImageMsg_(unsigned char * buffer, unsigned int size, const rclcpp::Time & stamp, const std::string & frame_id,
-                            sensor_msgs::msg::Image & image, const std::string & encoding)
+  static void FillImageMsg_(unsigned char * buffer, unsigned int size, const rclcpp::Time & stamp,
+                            const std::string & frame_id, sensor_msgs::msg::Image & image,
+                            const std::string & encoding)
   {
     image.header.frame_id = frame_id;
     // buffer is only valid for 16 frames, since ros2 publish has no real time guarantees, we must

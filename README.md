@@ -94,6 +94,26 @@ By default the driver will publish two topics per camera (X).
 * /clpe/cam_X/image_raw: The raw image published as `sensor_msgs::msg::Image`. The default encoding is `yuv422`. For other supported encodings, see Configuration below.
 * /clpe/cam_X/camera_info: The intrinsics of the camera published as a `sensor_msgs::msg::CameraInfo` message.
 
+## ROS2 Component
+
+The driver is also supported as a ROS2 component. To run it, start the component container
+
+```bash
+ros2 run rclcpp_components component_container
+```
+
+In another terminal, load the component
+
+```bash
+ros2 component load /ComponentManager clpe_ros clpe::ClpeComponentNode -p password:=<password>
+```
+
+Check that the component is loaded with
+
+```bash
+ros2 component list
+```
+
 # Configuration
 
 The driver supports the following ROS parameters to configure its behavior. The `password` and `encoding` parameters can be overwritten at run time. Other parameters can be modified within the [launch file](launch/clpe_ros.launch.py).

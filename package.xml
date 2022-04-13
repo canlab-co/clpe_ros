@@ -15,6 +15,7 @@
   <depend>sensor_msgs</depend>
   <depend>cv_bridge</depend>
   <depend>tf2</depend>
+  <depend>rclcpp_components</depend>
 
   <build_depend>ament_cmake</build_depend>
   <buildtool_depend>python3-colcon-common-extensions</buildtool_depend>

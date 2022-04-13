@@ -33,29 +33,43 @@ add_executable(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_lib)
 install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION lib/${PROJECT_NAME})
 
-# TODO: This doesn't work because the clpe library is not position independent.
-# include(GenerateExportHeader)
-# find_package(rclcpp_components REQUIRED)
-# add_library(${PROJECT_NAME}_component SHARED
-#   src/component.cpp)
-# target_compile_definitions(${PROJECT_NAME}_component
-#   PRIVATE "COMPOSITION_BUILDING_DLL")
-# target_include_directories(${PROJECT_NAME}_component PRIVATE
-#   ${CMAKE_CURRENT_BINARY_DIR}
-#   ${rclcpp_components_INCLUDE_DIRS})
-# target_link_libraries(${PROJECT_NAME}_component
-#   ${PROJECT_NAME}_lib
-#   ${rclcpp_components_LIBRARIES})
-# set_target_properties(${PROJECT_NAME}_component PROPERTIES
-#   CXX_VISIBILITY_PRESET hidden
-#   VISIBILITY_INLINES_HIDDEN ON)
-# GENERATE_EXPORT_HEADER(${PROJECT_NAME}_component)
-# rclcpp_components_register_nodes(${PROJECT_NAME}_component "clpe::ClpeNode")
-# set(node_plugins "${node_plugins}canlab::ClpeDriver;$<TARGET_FILE:${PROJECT_NAME}_component>\n")
-# file(GENERATE
-#   OUTPUT
-#     "${CMAKE_CURRENT_BINARY_DIR}/test_ament_index/$<CONFIG>/share/ament_index/resource_index/node_plugin/${PROJECT_NAME}"
-#   CONTENT "${node_plugins}")
+###############################################################################
+# ROS2 component
+###############################################################################
+
+include(GenerateExportHeader)
+find_package(rclcpp_components REQUIRED)
+
+# Create shared library
+add_library(${PROJECT_NAME}_component SHARED
+  src/component.cpp)
+target_compile_definitions(${PROJECT_NAME}_component
+  PRIVATE "COMPOSITION_BUILDING_DLL")
+target_include_directories(${PROJECT_NAME}_component PRIVATE
+  ${CMAKE_CURRENT_BINARY_DIR}
+  ${rclcpp_components_INCLUDE_DIRS})
+target_link_libraries(${PROJECT_NAME}_component
+  ${PROJECT_NAME}_lib
+  ${rclcpp_components_LIBRARIES})
+set_target_properties(${PROJECT_NAME}_component PROPERTIES
+  CXX_VISIBILITY_PRESET hidden
+  VISIBILITY_INLINES_HIDDEN ON)
+
+# Generate export headers
+GENERATE_EXPORT_HEADER(${PROJECT_NAME}_component)
+
+# register component
+rclcpp_components_register_nodes(${PROJECT_NAME}_component "clpe::ClpeComponentNode")
+set(node_plugins "${node_plugins}clpe::ClpeComponentNode;$<TARGET_FILE:${PROJECT_NAME}_component>\n")
+file(GENERATE
+  OUTPUT
+    "${CMAKE_CURRENT_BINARY_DIR}/test_ament_index/$<CONFIG>/share/ament_index/resource_index/node_plugin/${PROJECT_NAME}"
+  CONTENT "${node_plugins}")
+
+# install target
+install(TARGETS ${PROJECT_NAME}_component)
+
+###############################################################################
 
 option(CLPE_ROS_BUILD_BENCHMARKS "build benchmarks")
 if (${CLPE_ROS_BUILD_BENCHMARKS})

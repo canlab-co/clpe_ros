@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
-*/
+ */
 
 #include <ClpeClientApi.h>
 
@@ -28,9 +28,10 @@ class ClpeComponentNode
 {
 public:
   CLPE_ROS_COMPONENT_EXPORT
-  ClpeComponentNode(const rclcpp::NodeOptions & node)
+  ClpeComponentNode(const rclcpp::NodeOptions & options)
   {
-    this->node_ = ClpeNode<ClpeClientApi>::make_shared(ClpeClientApi());
+    this->node_ = ClpeNode<ClpeClientApi>::make_shared(ClpeClientApi(), options);
+    this->node_->Init();
   }
 
   CLPE_ROS_COMPONENT_EXPORT
