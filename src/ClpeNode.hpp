@@ -204,6 +204,7 @@ public:
             Me::FillImageMsg_(buffer, size, stamp, frame_id, image, Me::kNode_->encoding_);
             const auto time_after_fill = std::chrono::steady_clock::now();
             kImagePubs[cam_id].publish(image);
+            kCamInfos[cam_id].header.frame_id = frame_id;
             kCamInfos[cam_id].header.stamp = stamp;
             kInfoPubs[cam_id]->publish(kCamInfos[cam_id]);
             const auto time_after_pub = std::chrono::steady_clock::now();
