@@ -36,7 +36,7 @@ Create workspace
 ```bash
 mkdir -p ~/ws_clpe/src
 cd ~/ws_clpe/src
-git clone https://github.com/canlab-co/CLPE_G_NVP2650D_SDK #CLPE SDK
+git clone https://github.com/canlab-co/CLPE_G_NVP2650D_SDK -b noetic #CLPE SDK
 git clone https://github.com/osrf/canlab -b noetic # ROS driver
 ```
 

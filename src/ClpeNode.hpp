@@ -179,6 +179,7 @@ public:
             const ros::Time stamp = ros::Time::now();
             Me::FillImageMsg_(buffer, size, stamp, frame_id, image, Me::kNode_->encoding_);
             kImagePubs[cam_id].publish(image);
+            kCamInfos[cam_id].header.frame_id = frame_id;
             kCamInfos[cam_id].header.stamp = stamp;
             kInfoPubs[cam_id].publish(kCamInfos[cam_id]);
             return 0;
