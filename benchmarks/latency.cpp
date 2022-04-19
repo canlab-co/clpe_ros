@@ -31,8 +31,7 @@ int main(int argc, char * argv[])
   std::array<std::size_t, cam_count> cam_sub_count;
   // Latency in millis
   std::array<double, cam_count> avg_latencies;
-  for (auto i = 0; i < cam_count; ++i)
-  {
+  for (auto i = 0; i < cam_count; ++i) {
     cam_sub_count[i] = 1;
     avg_latencies[i] = 0.0;
   }
@@ -41,17 +40,17 @@ int main(int argc, char * argv[])
   using sensor_msgs::msg::Image;
   for (int i = 0; i < cam_count; ++i) {
     subs[i] = node->create_subscription<Image>(
-        "cam_" + std::to_string(i) + "/image_raw", rclcpp::SystemDefaultsQoS(),
-        [i, &node, &cam_sub_count, &avg_latencies](const Image::SharedPtr image) {
-          const auto local_time = node->get_clock()->now().nanoseconds();
-          const auto cam_time = rclcpp::Time(image->header.stamp).nanoseconds();
-          const auto diff_ns = local_time - cam_time;
-          const double latency = diff_ns / 1000000.0;
-          avg_latencies[i] = (avg_latencies[i] * cam_sub_count[i] + latency)/(cam_sub_count[i] + 1);
-          cam_sub_count[i]++;
-          std::cout << "cam_" << i << " latency = " << std::fixed << std::setprecision(3)
-                    << avg_latencies[i] << "ms" << std::endl;
-        });
+      "cam_" + std::to_string(i) + "/image_raw", rclcpp::SystemDefaultsQoS(),
+      [i, &node, &cam_sub_count, &avg_latencies](const Image::SharedPtr image) {
+        const auto local_time = node->get_clock()->now().nanoseconds();
+        const auto cam_time = rclcpp::Time(image->header.stamp).nanoseconds();
+        const auto diff_ns = local_time - cam_time;
+        const double latency = diff_ns / 1000000.0;
+        avg_latencies[i] = (avg_latencies[i] * cam_sub_count[i] + latency) / (cam_sub_count[i] + 1);
+        cam_sub_count[i]++;
+        std::cout << "cam_" << i << " latency = " << std::fixed << std::setprecision(3) <<
+          avg_latencies[i] << "ms" << std::endl;
+      });
   }
 
   rclcpp::spin(node);

@@ -41,7 +41,7 @@ public:
     return inst;
   }
 
-  const char * name() const noexcept override { return "ConnectionError"; }
+  const char * name() const noexcept override {return "ConnectionError";}
 
   std::string message(int code) const override
   {
@@ -76,7 +76,7 @@ public:
     return inst;
   }
 
-  const char * name() const noexcept override { return "StartStreamError"; }
+  const char * name() const noexcept override {return "StartStreamError";}
 
   std::string message(int code) const override
   {
@@ -102,7 +102,7 @@ public:
     return inst;
   }
 
-  const char * name() const noexcept override { return "GetFrameError"; }
+  const char * name() const noexcept override {return "GetFrameError";}
 
   std::string message(int code) const override
   {
@@ -131,7 +131,7 @@ public:
     return inst;
   }
 
-  const char * name() const noexcept override { return "GetEepromDataError"; }
+  const char * name() const noexcept override {return "GetEepromDataError";}
 
   std::string message(int code) const override
   {

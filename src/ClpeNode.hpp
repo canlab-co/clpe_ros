@@ -35,7 +35,8 @@
 namespace clpe
 {
 //==============================================================================
-enum class CalibrationModel : uint32_t {
+enum class CalibrationModel : uint32_t
+{
   Jhang = 0,
   FishEye = 1,
 };
@@ -54,19 +55,19 @@ static constexpr std::array<const char *, 6> kSupportedEncodings({
     "mono16",
     // camera encoding
     "yuv422",
-});
+  });
 
 static constexpr const char * kPassword = "password";
 static constexpr const char * kEncoding = "encoding";
 static constexpr const char * kCamEnable[] = {"cam_0_enable", "cam_1_enable", "cam_2_enable",
-                                              "cam_3_enable"};
+  "cam_3_enable"};
 static constexpr const char * kCamPose[] = {"cam_0_pose", "cam_1_pose", "cam_2_pose", "cam_3_pose"};
 static constexpr const char * kCamBaseFrame[] = {"cam_0_frame_id", "cam_1_frame_id",
-                                                 "cam_2_frame_id", "cam_3_frame_id"};
+  "cam_2_frame_id", "cam_3_frame_id"};
 static constexpr const char * kCamQos[] = {"cam_0_image_qos", "cam_1_image_qos", "cam_2_image_qos",
-                                           "cam_3_image_qos"};
+  "cam_3_image_qos"};
 static constexpr const char * kCamInfoQos[] = {"cam_0_info_qos", "cam_1_info_qos", "cam_2_info_qos",
-                                               "cam_3_info_qos"};
+  "cam_3_info_qos"};
 static constexpr const char * kQosSystemDefault = "SYSTEM_DEFAULT";
 static constexpr const char * kQosParameterEvents = "PARAMETER_EVENTS";
 static constexpr const char * kQosServicesDefault = "SERVICES_DEFAULT";
@@ -77,7 +78,8 @@ static constexpr const char * kQosHidDefault = "HID_DEFAULT";
 static constexpr const char * kQosExtrinsicsDefault = "EXTRINSICS_DEFAULT";
 
 //==============================================================================
-struct __attribute__((packed)) EepromData {
+struct __attribute__((packed)) EepromData
+{
   uint16_t signature_code;
   uint64_t version;
   CalibrationModel calibration_model;
@@ -100,7 +102,7 @@ struct __attribute__((packed)) EepromData {
   uint8_t production_date[11];
 };
 
-template <typename ClpeClientApi>
+template<typename ClpeClientApi>
 class ClpeNode : public rclcpp::Node
 {
 private:
@@ -108,7 +110,7 @@ private:
 
 public:
   static std::shared_ptr<Me> make_shared(
-      ClpeClientApi && clpe_api, const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
+    ClpeClientApi && clpe_api, const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
   {
     std::shared_ptr<Me> inst(new Me(std::move(clpe_api), options));
     if (Me::kNode_) {
@@ -130,8 +132,9 @@ public:
     const auto & password = this->get_parameter(kPassword).get_value<std::string>();
     const auto result = this->clpe_api.Clpe_Connection(password);
     if (result != 0) {
-      RCLCPP_FATAL(this->get_logger(), "Failed to initiate the clpe network connection (" +
-                                           ConnectionError::get().message(result) + ")");
+      RCLCPP_FATAL(
+        this->get_logger(), "Failed to initiate the clpe network connection (" +
+        ConnectionError::get().message(result) + ")");
       exit(result);
     }
 
@@ -142,7 +145,7 @@ public:
     tf_qos.transient_local();
     for (int i = 0; i < 4; ++i) {
       const auto tf_pub = this->create_publisher<geometry_msgs::msg::Transform>(
-          "cam_" + std::to_string(i) + "/tf", tf_qos);
+        "cam_" + std::to_string(i) + "/tf", tf_qos);
       geometry_msgs::msg::Transform tf_msg;
       auto pose = this->GetPoseParam_(i);
       tf_pub->publish(Me::CreateTfMsg_(pose[0], pose[1], pose[2], pose[3], pose[4], pose[5]));
@@ -152,8 +155,9 @@ public:
     RCLCPP_INFO(this->get_logger(), "Discovering camera properties");
     for (int i = 0; i < 4; ++i) {
       if (!this->cam_enabled_[i]) {
-        RCLCPP_INFO(this->get_logger(),
-                    "Skipped cam_" + std::to_string(i) + " because it is not enabled");
+        RCLCPP_INFO(
+          this->get_logger(),
+          "Skipped cam_" + std::to_string(i) + " because it is not enabled");
         continue;
       }
       const auto error = this->GetCameraInfo_(i, kCamInfos[i]);
@@ -171,52 +175,56 @@ public:
         continue;
       }
       kImagePubs[i] = image_transport::create_publisher(
-          this, "cam_" + std::to_string(i) + "/image_raw",
-          GetQos_(this->get_parameter(kCamQos[i]).get_value<std::string>()).get_rmw_qos_profile());
+        this, "cam_" + std::to_string(i) + "/image_raw",
+        GetQos_(this->get_parameter(kCamQos[i]).get_value<std::string>()).get_rmw_qos_profile());
       kInfoPubs[i] = this->create_publisher<sensor_msgs::msg::CameraInfo>(
-          "cam_" + std::to_string(i) + "/camera_info",
-          this->GetQos_(this->get_parameter(kCamInfoQos[i]).get_value<std::string>()));
+        "cam_" + std::to_string(i) + "/camera_info",
+        this->GetQos_(this->get_parameter(kCamInfoQos[i]).get_value<std::string>()));
     }
 
     // start publishing
     {
       RCLCPP_INFO(this->get_logger(), "Preparing camera for streaming");
       const auto result = this->clpe_api.Clpe_StartStream(
-          [](unsigned int cam_id, unsigned char * buffer, unsigned int size,
-             struct timeval *) -> int {
-            const auto start_time = std::chrono::steady_clock::now();
-            RCLCPP_DEBUG(Me::kNode_->get_logger(),
-                         "got new image for cam_" + std::to_string(cam_id));
+        [](unsigned int cam_id, unsigned char * buffer, unsigned int size,
+        struct timeval *) -> int {
+          const auto start_time = std::chrono::steady_clock::now();
+          RCLCPP_DEBUG(
+            Me::kNode_->get_logger(),
+            "got new image for cam_" + std::to_string(cam_id));
 
-            // skip all work if there is no subscribers
-            if (kImagePubs[cam_id].getNumSubscribers() == 0 &&
-                kInfoPubs[cam_id]->get_subscription_count() == 0) {
-              RCLCPP_DEBUG(Me::kNode_->get_logger(), "skipped publishing for cam_" +
-                                                         std::to_string(cam_id) +
-                                                         " because there are no subscribers");
-              return 0;
-            }
-
-            sensor_msgs::msg::Image image;
-            const auto frame_id =
-                Me::kNode_->get_parameter(kCamBaseFrame[cam_id]).get_value<std::string>();
-            const rclcpp::Time stamp = Me::kNode_->get_clock()->now();
-            Me::FillImageMsg_(buffer, size, stamp, frame_id, image, Me::kNode_->encoding_);
-            const auto time_after_fill = std::chrono::steady_clock::now();
-            kImagePubs[cam_id].publish(image);
-            kCamInfos[cam_id].header.frame_id = frame_id;
-            kCamInfos[cam_id].header.stamp = stamp;
-            kInfoPubs[cam_id]->publish(kCamInfos[cam_id]);
-            const auto time_after_pub = std::chrono::steady_clock::now();
-
-            RCLCPP_DEBUG(Me::kNode_->get_logger(),
-                         "Time to fill msg: %ld us. Time to publish: %ld us",
-                         (time_after_fill - start_time).count() / 1000,
-                         (time_after_pub - time_after_fill).count() / 1000);
+          // skip all work if there is no subscribers
+          if (kImagePubs[cam_id].getNumSubscribers() == 0 &&
+          kInfoPubs[cam_id]->get_subscription_count() == 0)
+          {
+            RCLCPP_DEBUG(
+              Me::kNode_->get_logger(), "skipped publishing for cam_" +
+              std::to_string(cam_id) +
+              " because there are no subscribers");
             return 0;
-          },
-          static_cast<int>(this->cam_enabled_[0]), static_cast<int>(this->cam_enabled_[1]),
-          static_cast<int>(this->cam_enabled_[2]), static_cast<int>(this->cam_enabled_[3]), 0);
+          }
+
+          sensor_msgs::msg::Image image;
+          const auto frame_id =
+          Me::kNode_->get_parameter(kCamBaseFrame[cam_id]).get_value<std::string>();
+          const rclcpp::Time stamp = Me::kNode_->get_clock()->now();
+          Me::FillImageMsg_(buffer, size, stamp, frame_id, image, Me::kNode_->encoding_);
+          const auto time_after_fill = std::chrono::steady_clock::now();
+          kImagePubs[cam_id].publish(image);
+          kCamInfos[cam_id].header.frame_id = frame_id;
+          kCamInfos[cam_id].header.stamp = stamp;
+          kInfoPubs[cam_id]->publish(kCamInfos[cam_id]);
+          const auto time_after_pub = std::chrono::steady_clock::now();
+
+          RCLCPP_DEBUG(
+            Me::kNode_->get_logger(),
+            "Time to fill msg: %ld us. Time to publish: %ld us",
+            (time_after_fill - start_time).count() / 1000,
+            (time_after_pub - time_after_fill).count() / 1000);
+          return 0;
+        },
+        static_cast<int>(this->cam_enabled_[0]), static_cast<int>(this->cam_enabled_[1]),
+        static_cast<int>(this->cam_enabled_[2]), static_cast<int>(this->cam_enabled_[3]), 0);
       if (result != 0) {
         const std::error_code error(result, clpe::StartStreamError::get());
         RCLCPP_FATAL(this->get_logger(), "Failed to start streaming (" + error.message() + ")");
@@ -237,7 +245,7 @@ private:
   std::array<bool, 4> cam_enabled_;
 
   explicit ClpeNode(ClpeClientApi && clpe_api, const rclcpp::NodeOptions & options)
-      : rclcpp::Node("clpe", options), clpe_api(std::move(clpe_api))
+  : rclcpp::Node("clpe", options), clpe_api(std::move(clpe_api))
   {
     // declare ros params
     {
@@ -253,7 +261,7 @@ private:
 
       rcl_interfaces::msg::ParameterDescriptor tf_desc;
       tf_desc.description =
-          "Pose relative to the base, 6 values corresponding to [x, y, z, roll, pitch, yaw]";
+        "Pose relative to the base, 6 values corresponding to [x, y, z, roll, pitch, yaw]";
       this->declare_parameter(kCamPose[i], std::vector<double>({0, 0, 0, 0, 0, 0}), tf_desc);
 
       rcl_interfaces::msg::ParameterDescriptor base_frame_desc;
@@ -263,27 +271,27 @@ private:
 
       rcl_interfaces::msg::ParameterDescriptor qos_desc;
       qos_desc.description =
-          "Sets the QoS by which the topic is published. Available values are the following "
-          "strings: SYSTEM_DEFAULT, PARAMETER_EVENTS, SERVICES_DEFAULT, PARAMETERS, DEFAULT, "
-          "SENSOR_DATA, HID_DEFAULT (= DEFAULT with depth of 100), EXTRINSICS_DEFAULT (= DEFAULT "
-          "with depth of 1 and transient local durability). Default is SENSOR_DATA.";
+        "Sets the QoS by which the topic is published. Available values are the following "
+        "strings: SYSTEM_DEFAULT, PARAMETER_EVENTS, SERVICES_DEFAULT, PARAMETERS, DEFAULT, "
+        "SENSOR_DATA, HID_DEFAULT (= DEFAULT with depth of 100), EXTRINSICS_DEFAULT (= DEFAULT "
+        "with depth of 1 and transient local durability). Default is SENSOR_DATA.";
       qos_desc.read_only = true;
       this->declare_parameter(kCamQos[i], "SENSOR_DATA", qos_desc);
 
       rcl_interfaces::msg::ParameterDescriptor info_qos_desc;
       info_qos_desc.description =
-          "Sets the QoS by which the info topic is published. Available values are the following "
-          "strings: SYSTEM_DEFAULT, PARAMETER_EVENTS, SERVICES_DEFAULT, PARAMETERS, DEFAULT, "
-          "SENSOR_DATA, HID_DEFAULT (= DEFAULT with depth of 100), EXTRINSICS_DEFAULT (= DEFAULT "
-          "with depth of 1 and transient local durability). Default is SYSTEM_DEFAULT.";
+        "Sets the QoS by which the info topic is published. Available values are the following "
+        "strings: SYSTEM_DEFAULT, PARAMETER_EVENTS, SERVICES_DEFAULT, PARAMETERS, DEFAULT, "
+        "SENSOR_DATA, HID_DEFAULT (= DEFAULT with depth of 100), EXTRINSICS_DEFAULT (= DEFAULT "
+        "with depth of 1 and transient local durability). Default is SYSTEM_DEFAULT.";
       info_qos_desc.read_only = true;
       this->declare_parameter(kCamInfoQos[i], "SYSTEM_DEFAULT", info_qos_desc);
     }
     {
       rcl_interfaces::msg::ParameterDescriptor desc;
       desc.description =
-          "Image encoding, supported formats are: bgr8, bgra8, rgb8, rgba8, mono16, yuv422. "
-          "Defaults to yuv422. Note that encodings other than yuv422 incurs conversion overhead.";
+        "Image encoding, supported formats are: bgr8, bgra8, rgb8, rgba8, mono16, yuv422. "
+        "Defaults to yuv422. Note that encodings other than yuv422 incurs conversion overhead.";
       desc.read_only = true;
       this->declare_parameter(kEncoding, "yuv422", desc);
     }
@@ -304,8 +312,9 @@ private:
     return pose;
   }
 
-  static geometry_msgs::msg::Transform CreateTfMsg_(double x, double y, double z, double roll,
-                                                    double pitch, double yaw)
+  static geometry_msgs::msg::Transform CreateTfMsg_(
+    double x, double y, double z, double roll,
+    double pitch, double yaw)
   {
     geometry_msgs::msg::Transform tf_msg;
     tf_msg.translation.x = x;
@@ -333,7 +342,7 @@ private:
     cam_info.height = 1080;
     EepromData eeprom_data;
     const auto result =
-        this->clpe_api.Clpe_GetEepromData(cam_id, reinterpret_cast<unsigned char *>(&eeprom_data));
+      this->clpe_api.Clpe_GetEepromData(cam_id, reinterpret_cast<unsigned char *>(&eeprom_data));
     if (result != 0) {
       return std::error_code(result, GetEepromDataError::get());
     }
@@ -347,13 +356,14 @@ private:
     }
     cam_info.k = {eeprom_data.fx, 0, eeprom_data.cx, 0, eeprom_data.fy, eeprom_data.cy, 0, 0, 1};
     cam_info.d = {eeprom_data.k1, eeprom_data.k2, eeprom_data.p1,
-                  eeprom_data.p2, eeprom_data.k3, eeprom_data.k4};
+      eeprom_data.p2, eeprom_data.k3, eeprom_data.k4};
     return kNoError;
   }
 
-  static void FillImageMsg_(unsigned char * buffer, unsigned int size, const rclcpp::Time & stamp,
-                            const std::string & frame_id, sensor_msgs::msg::Image & image,
-                            const std::string & encoding)
+  static void FillImageMsg_(
+    unsigned char * buffer, unsigned int size, const rclcpp::Time & stamp,
+    const std::string & frame_id, sensor_msgs::msg::Image & image,
+    const std::string & encoding)
   {
     image.header.frame_id = frame_id;
     // buffer is only valid for 16 frames, since ros2 publish has no real time guarantees, we must
@@ -382,9 +392,10 @@ private:
     if (result != 0) {
       return std::error_code(result, GetFrameError::get());
     }
-    this->FillImageMsg_(buffer, size, Me::kNode->get_clock()->now(),
-                        this->get_parameter(kCamBaseFrame[cam_id]).get_value<std::string>(), image,
-                        this->encoding_);
+    this->FillImageMsg_(
+      buffer, size, Me::kNode->get_clock()->now(),
+      this->get_parameter(kCamBaseFrame[cam_id]).get_value<std::string>(), image,
+      this->encoding_);
     return kNoError;
   }
 
@@ -416,7 +427,8 @@ private:
   {
     const auto enc = this->get_parameter(kEncoding).get_value<std::string>();
     if (std::find(kSupportedEncodings.begin(), kSupportedEncodings.end(), enc) ==
-        kSupportedEncodings.end()) {
+      kSupportedEncodings.end())
+    {
       RCLCPP_FATAL(this->get_logger(), "Unsupported encoding");
       exit(-1);
     }
@@ -426,14 +438,14 @@ private:
   friend class ClpeComponentNode;
 };
 
-template <typename ClpeClientApi>
+template<typename ClpeClientApi>
 ClpeNode<ClpeClientApi> * ClpeNode<ClpeClientApi>::kNode_;
-template <typename ClpeClientApi>
+template<typename ClpeClientApi>
 std::unordered_map<int, image_transport::Publisher> ClpeNode<ClpeClientApi>::kImagePubs;
-template <typename ClpeClientApi>
+template<typename ClpeClientApi>
 std::array<rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr, 4>
-    ClpeNode<ClpeClientApi>::kInfoPubs;
-template <typename ClpeClientApi>
+ClpeNode<ClpeClientApi>::kInfoPubs;
+template<typename ClpeClientApi>
 std::array<sensor_msgs::msg::CameraInfo, 4> ClpeNode<ClpeClientApi>::kCamInfos;
 
 }  // namespace clpe
