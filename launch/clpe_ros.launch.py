@@ -35,19 +35,19 @@ parameters = {
   "cam_0_pose": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
 
   "cam_1_enable": True,
-  "cam_1_frame_id": "cam_0_link",
+  "cam_1_frame_id": "cam_1_link",
   "cam_1_image_qos": "SENSOR_DATA",
   "cam_1_info_qos": "SYSTEM_DEFAULT",
   "cam_1_pose": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
 
   "cam_2_enable": True,
-  "cam_2_frame_id": "cam_0_link",
+  "cam_2_frame_id": "cam_2_link",
   "cam_2_image_qos": "SENSOR_DATA",
   "cam_2_info_qos": "SYSTEM_DEFAULT",
   "cam_2_pose": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
 
   "cam_3_enable": True,
-  "cam_3_frame_id": "cam_0_link",
+  "cam_3_frame_id": "cam_3_link",
   "cam_3_image_qos": "SENSOR_DATA",
   "cam_3_info_qos": "SYSTEM_DEFAULT",
   "cam_3_pose": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
