@@ -133,8 +133,8 @@ public:
     const auto result = this->clpe_api.Clpe_Connection(password);
     if (result != 0) {
       RCLCPP_FATAL(
-        this->get_logger(), "Failed to initiate the clpe network connection (" +
-        ConnectionError::get().message(result) + ")");
+        this->get_logger(), "Failed to initiate the clpe network connection (%s)",
+        ConnectionError::get().message(result).c_str());
       exit(result);
     }
 
@@ -157,12 +157,14 @@ public:
       if (!this->cam_enabled_[i]) {
         RCLCPP_INFO(
           this->get_logger(),
-          "Skipped cam_" + std::to_string(i) + " because it is not enabled");
+          "Skipped cam_%s because it is not enabled",
+          std::to_string(i).c_str());
         continue;
       }
       const auto error = this->GetCameraInfo_(i, kCamInfos[i]);
       if (error) {
-        RCLCPP_FATAL(this->get_logger(), "Failed to get camera info (" + error.message() + ")");
+        RCLCPP_FATAL(this->get_logger(), "Failed to get camera info (%s)",
+        error.message().c_str());
         exit(error.value());
       }
     }
@@ -191,16 +193,17 @@ public:
           const auto start_time = std::chrono::steady_clock::now();
           RCLCPP_DEBUG(
             Me::kNode_->get_logger(),
-            "got new image for cam_" + std::to_string(cam_id));
+            "got new image for cam_%s",
+            std::to_string(cam_id).c_str());
 
           // skip all work if there is no subscribers
           if (kImagePubs[cam_id].getNumSubscribers() == 0 &&
           kInfoPubs[cam_id]->get_subscription_count() == 0)
           {
             RCLCPP_DEBUG(
-              Me::kNode_->get_logger(), "skipped publishing for cam_" +
-              std::to_string(cam_id) +
-              " because there are no subscribers");
+              Me::kNode_->get_logger(),
+              "skipped publishing for cam_%s because there are no subscribers",
+              std::to_string(cam_id).c_str());
             return 0;
           }
 
@@ -227,7 +230,8 @@ public:
         static_cast<int>(this->cam_enabled_[2]), static_cast<int>(this->cam_enabled_[3]), 0);
       if (result != 0) {
         const std::error_code error(result, clpe::StartStreamError::get());
-        RCLCPP_FATAL(this->get_logger(), "Failed to start streaming (" + error.message() + ")");
+        RCLCPP_FATAL(this->get_logger(), "Failed to start streaming (%s)",
+        error.message().c_str());
         exit(result);
       }
       RCLCPP_INFO(this->get_logger(), "Start streaming images");
