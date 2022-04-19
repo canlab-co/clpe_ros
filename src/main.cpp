@@ -4,7 +4,7 @@
 
 #include "ClpeNode.hpp"
 
-int main(int argc, char ** argv)
+int main(int argc, char** argv)
 {
   ros::init(argc, argv, "clpe_node");
 

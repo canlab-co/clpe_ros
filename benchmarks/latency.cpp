@@ -21,7 +21,7 @@
 #include <sensor_msgs/Image.h>
 
 //==============================================================================
-int main(int argc, char * argv[])
+int main(int argc, char* argv[])
 {
   ros::init(argc, argv, "clpe");
 
@@ -31,27 +31,28 @@ int main(int argc, char * argv[])
   std::array<std::size_t, cam_count> cam_sub_count;
   // Latency in millis
   std::array<double, cam_count> avg_latencies;
-  for (auto i = 0; i < cam_count; ++i) {
+  for (auto i = 0; i < cam_count; ++i)
+  {
     cam_sub_count[i] = 1;
     avg_latencies[i] = 0.0;
   }
 
   std::array<ros::Subscriber, cam_count> subs;
   using sensor_msgs::Image;
-  for (int i = 0; i < cam_count; ++i) {
-    subs[i] = node.subscribe<Image>(
-        "/clpe_node/cam_" + std::to_string(i) + "/image_raw", 10,
-        [i, &node, &cam_sub_count, &avg_latencies](const Image::ConstPtr& image) {
-          const auto local_time = ros::Time::now().toNSec();
-          const auto cam_time = image->header.stamp.toNSec();
-          const auto diff_ns = local_time - cam_time;
-          const double latency = diff_ns / 1000000.0;
-          avg_latencies[i] =
-              (avg_latencies[i] * cam_sub_count[i] + latency) / (cam_sub_count[i] + 1);
-          cam_sub_count[i]++;
-          std::cout << "cam_" << i << " latency = " << std::fixed << std::setprecision(3)
-                    << avg_latencies[i] << "ms" << std::endl;
-        });
+  for (int i = 0; i < cam_count; ++i)
+  {
+    subs[i] = node.subscribe<Image>("/clpe_node/cam_" + std::to_string(i) + "/image_raw", 10,
+                                    [i, &node, &cam_sub_count, &avg_latencies](const Image::ConstPtr& image) {
+                                      const auto local_time = ros::Time::now().toNSec();
+                                      const auto cam_time = image->header.stamp.toNSec();
+                                      const auto diff_ns = local_time - cam_time;
+                                      const double latency = diff_ns / 1000000.0;
+                                      avg_latencies[i] =
+                                          (avg_latencies[i] * cam_sub_count[i] + latency) / (cam_sub_count[i] + 1);
+                                      cam_sub_count[i]++;
+                                      std::cout << "cam_" << i << " latency = " << std::fixed << std::setprecision(3)
+                                                << avg_latencies[i] << "ms" << std::endl;
+                                    });
   }
 
   ros::spin();
