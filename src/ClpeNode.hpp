@@ -163,8 +163,9 @@ public:
       }
       const auto error = this->GetCameraInfo_(i, kCamInfos[i]);
       if (error) {
-        RCLCPP_FATAL(this->get_logger(), "Failed to get camera info (%s)",
-        error.message().c_str());
+        RCLCPP_FATAL(
+          this->get_logger(), "Failed to get camera info (%s)",
+          error.message().c_str());
         exit(error.value());
       }
     }
@@ -230,8 +231,9 @@ public:
         static_cast<int>(this->cam_enabled_[2]), static_cast<int>(this->cam_enabled_[3]), 0);
       if (result != 0) {
         const std::error_code error(result, clpe::StartStreamError::get());
-        RCLCPP_FATAL(this->get_logger(), "Failed to start streaming (%s)",
-        error.message().c_str());
+        RCLCPP_FATAL(
+          this->get_logger(), "Failed to start streaming (%s)",
+          error.message().c_str());
         exit(result);
       }
       RCLCPP_INFO(this->get_logger(), "Start streaming images");
