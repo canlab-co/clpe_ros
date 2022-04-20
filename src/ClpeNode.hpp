@@ -1,5 +1,7 @@
 #pragma once
 
+#include <unordered_map>
+
 #include <cv_bridge/cv_bridge.h>
 #include <geometry_msgs/Transform.h>
 #include <image_transport/image_transport.h>
@@ -9,8 +11,7 @@
 #include <sensor_msgs/distortion_models.h>
 #include <sensor_msgs/image_encodings.h>
 #include <tf2/LinearMath/Quaternion.h>
-
-#include <unordered_map>
+#include <clpe_ros_msgs/ClpeCameraInfo.h>
 
 #include "errors.hpp"
 
@@ -75,7 +76,7 @@ struct __attribute__((packed)) EepromData
   float p2;
   uint8_t reserved2[8];
   uint16_t checksum;
-  uint8_t production_date[11];
+  char production_date[11];
 };
 
 template <typename ClpeClientApi>
@@ -137,11 +138,21 @@ public:
         ROS_INFO("Skipped cam_%i  because it is not enabled", i);
         continue;
       }
-      const auto error = this->GetCameraInfo_(i, kCamInfos[i]);
-      if (error)
       {
-        ROS_FATAL("Failed to get camera info (%s)", error.message().c_str());
-        exit(error.value());
+        const auto error = this->GetCameraInfo_(i, kCamInfos[i]);
+        if (error)
+        {
+          ROS_FATAL("Failed to get camera info (%s)", error.message().c_str());
+          exit(error.value());
+        }
+      }
+      {
+        const auto error = this->GetClpeCameraInfo_(i, kClpeCamInfos[i]);
+        if (error)
+        {
+          ROS_FATAL("Failed to get camera info (%s)", error.message().c_str());
+          exit(error.value());
+        }
       }
     }
     ROS_INFO("Successfully discovered camera properties");
@@ -161,6 +172,8 @@ public:
       bool info_queue_size = this->param<int>(kCamInfoQueueSize[i], 10);
       kInfoPubs[i] = this->advertise<sensor_msgs::CameraInfo>("cam_" + std::to_string(i) + "/camera_info",
                                                               info_queue_size, info_latch);
+      kClpeInfoPubs[i] = this->advertise<clpe_ros_msgs::ClpeCameraInfo>("cam_" + std::to_string(i) + "/clpe_camera_info",
+                                                              info_queue_size, info_latch);
     }
 
     // start publishing
@@ -171,7 +184,9 @@ public:
             ROS_DEBUG("got new image for cam_%i", cam_id);
 
             // skip all work if there is no subscribers
-            if (kImagePubs[cam_id].getNumSubscribers() == 0 && kInfoPubs[cam_id].getNumSubscribers() == 0)
+            if (kImagePubs[cam_id].getNumSubscribers() == 0 &&
+              kInfoPubs[cam_id].getNumSubscribers() == 0 &&
+              kClpeInfoPubs[cam_id].getNumSubscribers() == 0)
             {
               ROS_DEBUG("skipped publishing for cam_%i because there are no subscribers", cam_id);
               return 0;
@@ -185,6 +200,7 @@ public:
             kCamInfos[cam_id].header.frame_id = frame_id;
             kCamInfos[cam_id].header.stamp = stamp;
             kInfoPubs[cam_id].publish(kCamInfos[cam_id]);
+            kClpeInfoPubs[cam_id].publish(kClpeCamInfos[cam_id]);
             return 0;
           },
           static_cast<int>(this->cam_enabled_[0]), static_cast<int>(this->cam_enabled_[1]),
@@ -205,6 +221,8 @@ private:
   static std::unordered_map<int, image_transport::Publisher> kImagePubs;
   static std::array<ros::Publisher, 4> kInfoPubs;
   static std::array<sensor_msgs::CameraInfo, 4> kCamInfos;
+  static std::array<ros::Publisher, 4> kClpeInfoPubs;
+  static std::array<clpe_ros_msgs::ClpeCameraInfo, 4> kClpeCamInfos;
 
   std::unique_ptr<image_transport::ImageTransport> transport_;
   std::string encoding_;
@@ -273,6 +291,37 @@ private:
     }
     cam_info.K = { eeprom_data.fx, 0, eeprom_data.cx, 0, eeprom_data.fy, eeprom_data.cy, 0, 0, 1 };
     cam_info.D = { eeprom_data.k1, eeprom_data.k2, eeprom_data.p1, eeprom_data.p2, eeprom_data.k3, eeprom_data.k4 };
+    cam_info.P = {
+      eeprom_data.fx, 0, eeprom_data.cx, 0,
+      0, eeprom_data.fy, eeprom_data.cy, 0,
+      0, 0, 1, 0
+    };
+    return kNoError;
+  }
+
+  std::error_code GetClpeCameraInfo_(int cam_id, clpe_ros_msgs::ClpeCameraInfo& msg)
+  {
+    EepromData eeprom_data;
+    const auto result =
+      this->clpe_api.Clpe_GetEepromData(cam_id, reinterpret_cast<unsigned char*>(&eeprom_data));
+    if (result != 0) {
+      return std::error_code(result, GetEepromDataError::get());
+    }
+
+    msg.calibration_model = static_cast<uint32_t>(eeprom_data.calibration_model);
+    msg.fx = eeprom_data.fx;
+    msg.fy = eeprom_data.fy;
+    msg.cx = eeprom_data.cx;
+    msg.cy = eeprom_data.cy;
+    msg.k1 = eeprom_data.k1;
+    msg.k2 = eeprom_data.k2;
+    msg.k3 = eeprom_data.k3;
+    msg.k4 = eeprom_data.k4;
+    msg.rms = eeprom_data.rms;
+    msg.fov = eeprom_data.fov;
+    msg.p1 = eeprom_data.p1;
+    msg.p2 = eeprom_data.p2;
+    msg.production_date = std::string(eeprom_data.production_date);
     return kNoError;
   }
 
@@ -329,11 +378,21 @@ private:
 
 template <typename ClpeClientApi>
 ClpeNode<ClpeClientApi>* ClpeNode<ClpeClientApi>::kNode_;
+
 template <typename ClpeClientApi>
 std::unordered_map<int, image_transport::Publisher> ClpeNode<ClpeClientApi>::kImagePubs;
+
 template <typename ClpeClientApi>
 std::array<ros::Publisher, 4> ClpeNode<ClpeClientApi>::kInfoPubs;
+
 template <typename ClpeClientApi>
 std::array<sensor_msgs::CameraInfo, 4> ClpeNode<ClpeClientApi>::kCamInfos;
+
+template <typename ClpeClientApi>
+std::array<ros::Publisher, 4>
+ClpeNode<ClpeClientApi>::kClpeInfoPubs;
+
+template <typename ClpeClientApi>
+std::array<clpe_ros_msgs::ClpeCameraInfo, 4> ClpeNode<ClpeClientApi>::kClpeCamInfos;
 
 }  // namespace clpe
