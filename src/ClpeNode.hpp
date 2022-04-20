@@ -196,6 +196,9 @@ public:
       kInfoPubs[i] = this->create_publisher<sensor_msgs::msg::CameraInfo>(
         "cam_" + std::to_string(i) + "/camera_info",
         this->GetQos_(this->get_parameter(kCamInfoQos[i]).get_value<std::string>()));
+      kClpeInfoPubs[i] = this->create_publisher<clpe_ros_msgs::msg::ClpeCameraInfo>(
+        "cam_" + std::to_string(i) + "/clpe_camera_info",
+        this->GetQos_(this->get_parameter(kCamInfoQos[i]).get_value<std::string>()));
     }
 
     // start publishing
@@ -231,6 +234,7 @@ public:
           kCamInfos[cam_id].header.frame_id = frame_id;
           kCamInfos[cam_id].header.stamp = stamp;
           kInfoPubs[cam_id]->publish(kCamInfos[cam_id]);
+          kClpeInfoPubs[cam_id]->publish(kClpeCamInfos[cam_id]);
           const auto time_after_pub = std::chrono::steady_clock::now();
 
           RCLCPP_DEBUG(
@@ -402,9 +406,7 @@ private:
     msg.fov = eeprom_data.fov;
     msg.p1 = eeprom_data.p1;
     msg.p2 = eeprom_data.p2;
-    std::copy(
-      eeprom_data.production_date.begin(),
-      eeprom_data.production_date.end(), msg.production_date.begin());
+    msg.production_date = std::string(eeprom_data.production_date.data());
     return kNoError;
   }
 
