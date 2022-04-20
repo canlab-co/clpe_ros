@@ -20,7 +20,7 @@ Alternatively, containers or VM may be used but the CLPE-G-NVP2650D drivers has 
 
 ## System dependencies
 ```bash
-sudo apt update && sudo apt install git cmake python3-colcon* python3-rosdep -y
+sudo apt update && sudo apt install git cmake python3-colcon* python3-rosdep wget -y
 ```
 
 ## ROS 1 Installation
@@ -35,9 +35,9 @@ source ~/ros1_noetic/install/setup.bash # if installed from source following lin
 Create workspace
 ```bash
 mkdir -p ~/ws_clpe/src
-cd ~/ws_clpe/src
-git clone https://github.com/canlab-co/CLPE_G_NVP2650D_SDK -b noetic #CLPE SDK
-git clone https://github.com/osrf/canlab -b noetic # ROS driver
+cd ~/ws_clpe/
+wget https://raw.githubusercontent.com/canlab-co/clpe_ros/noetic/clpe.repos
+vcs import src < clpe.repos
 ```
 
 Install dependencies
@@ -71,6 +71,7 @@ roslaunch clpe_ros clpe_ros.launch password:=<sudo-password> encoding:=yuv422
 By default the driver will publish two topics per camera (X).
 * /clpe_ros/cam_X/image_raw: The raw image published as `sensor_msgs::Image`. The default encoding is `yuv422`. For other supported encodings, see Configuration below.
 * /clpe_ros/cam_X/camera_info: The intrinsics of the camera published as a `sensor_msgs::CameraInfo` message.
+* /clpe_ros/cam_X/clpe_camera_info: The intrinsics of the camera published as a clpe_ros_msgs::ClpeCameraInfo message.
 
 ## Visualizing in Rviz
 

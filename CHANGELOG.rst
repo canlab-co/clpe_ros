@@ -6,7 +6,7 @@ Changelog for package clpe_ros
 ------------------
 * Provides ROS 1 Noetic driver for CANLAB CLPE-G-NVP2650D vision system
 * By default the driver will publish three topics for each camera X.
-  * /clpe/cam_X/image_raw: The raw image published as sensor_msgs::msg::Image. The default encoding is yuv422. For other supported encodings, see Configuration.
-  * /clpe/cam_X/camera_info: The intrinsics of the camera published as a sensor_msgs::msg::CameraInfo message.
-  * /clpe/cam_X/clpe_camera_info: The intrinsics of the camera published as a clpe_ros_msgs::msg::ClpeCameraInfo message.
+  * /clpe_ros/cam_X/image_raw: The raw image published as sensor_msgs::msg::Image. The default encoding is yuv422. For other supported encodings, see Configuration.
+  * /clpe_ros/cam_X/camera_info: The intrinsics of the camera published as a sensor_msgs::msg::CameraInfo message.
+  * /clpe_ros/cam_X/clpe_camera_info: The intrinsics of the camera published as a clpe_ros_msgs::ClpeCameraInfo message.
 * Contributors: Teo Koon Peng, Yadunund Vijay
