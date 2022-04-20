@@ -83,7 +83,7 @@ static constexpr const char * kQosExtrinsicsDefault = "EXTRINSICS_DEFAULT";
 //==============================================================================
 struct __attribute__((packed)) EepromData
 {
-  std::array<char, 2> signature_code;
+  uint16_t signature_code;
   uint64_t version;
   CalibrationModel calibration_model;
   float fx;
@@ -102,7 +102,7 @@ struct __attribute__((packed)) EepromData
   float p2;
   uint8_t reserved2[8];
   uint16_t checksum;
-  std::array<char, 11> production_date;
+  char production_date[11];
 };
 
 template<typename ClpeClientApi>
@@ -411,7 +411,7 @@ private:
     msg.fov = eeprom_data.fov;
     msg.p1 = eeprom_data.p1;
     msg.p2 = eeprom_data.p2;
-    msg.production_date = std::string(eeprom_data.production_date.data());
+    msg.production_date = std::string(eeprom_data.production_date);
     return kNoError;
   }
 
