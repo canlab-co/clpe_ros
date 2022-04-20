@@ -21,7 +21,7 @@ Alternatively, containers or VM may be used but the CLPE-G-NVP2650D drivers has 
 
 ## System dependencies
 ```bash
-sudo apt update && sudo apt install git cmake python3-colcon* python3-rosdep -y
+sudo apt update && sudo apt install git cmake python3-colcon* python3-rosdep wget -y
 ```
 
 ## ROS 2 Installation
@@ -37,9 +37,9 @@ source ~/ros2_foxy/install/setup.bash # if installed from source following link 
 Create workspace
 ```bash
 mkdir -p ~/ws_clpe/src
-cd ~/ws_clpe/src
-git clone https://github.com/canlab-co/CLPE_G_NVP2650D_SDK #CLPE SDK
-git clone https://github.com/osrf/canlab # ROS driver
+cd ~/ws_clpe/
+wget https://raw.githubusercontent.com/canlab-co/clpe_ros/main/clpe.repos
+vcs import src < clpe.repos
 ```
 
 Install dependencies
@@ -90,9 +90,11 @@ ros2 launch clpe_ros clpe_ros.launch.py password:=<sudo-password> encoding:=yuv4
 
 > Note: If `sudo_password` is a number, say `42`, you should pass it as `password:=\'42\'`
 
-By default the driver will publish two topics per camera (X).
+By default the driver will publish three topics per camera X.
 * /clpe/cam_X/image_raw: The raw image published as `sensor_msgs::msg::Image`. The default encoding is `yuv422`. For other supported encodings, see Configuration below.
 * /clpe/cam_X/camera_info: The intrinsics of the camera published as a `sensor_msgs::msg::CameraInfo` message.
+* /clpe/cam_X/clpe_camera_info: The intrinsics of the camera published as a clpe_ros_msgs::msg::ClpeCameraInfo message.
+
 
 ## ROS2 Component
 
