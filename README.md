@@ -21,7 +21,7 @@ Alternatively, containers or VM may be used but the CLPE-G-NVP2650D drivers has 
 
 ## System dependencies
 ```bash
-sudo apt update && sudo apt install git cmake python3-colcon* python3-rosdep wget -y
+sudo apt update && sudo apt install git cmake wget gcc python3-colcon* python3-rosdep python3-vcstool -y
 ```
 
 ## ROS 2 Installation
