@@ -381,6 +381,11 @@ private:
     cam_info.k = {eeprom_data.fx, 0, eeprom_data.cx, 0, eeprom_data.fy, eeprom_data.cy, 0, 0, 1};
     cam_info.d = {eeprom_data.k1, eeprom_data.k2, eeprom_data.p1,
       eeprom_data.p2, eeprom_data.k3, eeprom_data.k4};
+    cam_info.p = {
+      eeprom_data.fx, 0, eeprom_data.cx, 0,
+      0, eeprom_data.fy, eeprom_data.cy, 0,
+      0, 0, 1, 0
+    };
     return kNoError;
   }
 
