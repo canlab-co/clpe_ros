@@ -36,7 +36,7 @@ Create workspace
 ```bash
 mkdir -p ~/ws_clpe/src
 cd ~/ws_clpe/
-wget https://raw.githubusercontent.com/canlab-co/clpe_ros/noetic/clpe.repos
+wget https://raw.githubusercontent.com/canlab-co/clpe_ros/noetic-AP0202/clpe.repos
 vcs import src < clpe.repos
 ```
 
