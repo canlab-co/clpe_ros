@@ -163,6 +163,7 @@ public:
           std::to_string(i).c_str());
         continue;
       }
+      /*
       {
         const auto error = this->GetCameraInfo_(i, kCamInfos[i]);
         if (error) {
@@ -181,6 +182,7 @@ public:
           exit(error.value());
         }
       }
+      */
     }
     RCLCPP_INFO(this->get_logger(), "Successfully discovered camera properties");
 
