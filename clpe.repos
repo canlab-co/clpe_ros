@@ -6,7 +6,7 @@ repositories:
   canlab-co/clpe_ros_msgs:
     type: git
     url: https://github.com/canlab-co/clpe_ros_msgs.git
-    version: noetic
+    version: noetic-AP0202
   canlab-co/clpe_ros:
     type: git
     url: https://github.com/canlab-co/clpe_ros.git
