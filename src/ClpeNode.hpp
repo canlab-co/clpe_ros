@@ -155,6 +155,7 @@ public:
         ROS_INFO("Skipped cam_%i  because it is not enabled", i);
         continue;
       }
+      /*
       {
         const auto error = this->GetCameraInfo_(i, kCamInfos[i]);
         if (error)
@@ -171,6 +172,7 @@ public:
           exit(error.value());
         }
       }
+      */
     }
     ROS_INFO("Successfully discovered camera properties");
 
