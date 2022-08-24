@@ -27,10 +27,7 @@
 #include <image_transport/image_transport.hpp>
 #include <sensor_msgs/distortion_models.hpp>
 #include <sensor_msgs/image_encodings.hpp>
-#include <sensor_msgs/msg/camera_info.hpp>
 #include <sensor_msgs/msg/image.hpp>
-
-#include <clpe_ros_msgs/msg/clpe_camera_info.hpp>
 
 #include "errors.hpp"
 
@@ -69,8 +66,6 @@ static constexpr const char * kCamBaseFrame[] = {"cam_0_frame_id", "cam_1_frame_
   "cam_2_frame_id", "cam_3_frame_id"};
 static constexpr const char * kCamQos[] = {"cam_0_image_qos", "cam_1_image_qos", "cam_2_image_qos",
   "cam_3_image_qos"};
-static constexpr const char * kCamInfoQos[] = {"cam_0_info_qos", "cam_1_info_qos", "cam_2_info_qos",
-  "cam_3_info_qos"};
 static constexpr const char * kQosSystemDefault = "SYSTEM_DEFAULT";
 static constexpr const char * kQosParameterEvents = "PARAMETER_EVENTS";
 static constexpr const char * kQosServicesDefault = "SERVICES_DEFAULT";
@@ -81,30 +76,6 @@ static constexpr const char * kQosHidDefault = "HID_DEFAULT";
 static constexpr const char * kQosExtrinsicsDefault = "EXTRINSICS_DEFAULT";
 
 //==============================================================================
-struct __attribute__((packed)) EepromData
-{
-  uint16_t signature_code;
-  uint64_t version;
-  CalibrationModel calibration_model;
-  float fx;
-  float fy;
-  float cx;
-  float cy;
-  float k1;
-  float k2;
-  float k3;
-  float k4;
-  float rms;
-  float fov;
-  float calibration_temperature;
-  uint8_t reserved1[20];
-  float p1;
-  float p2;
-  uint8_t reserved2[8];
-  uint16_t checksum;
-  char production_date[11];
-};
-
 template<typename ClpeClientApi>
 class ClpeNode : public rclcpp::Node
 {
@@ -154,7 +125,6 @@ public:
       tf_pub->publish(Me::CreateTfMsg_(pose[0], pose[1], pose[2], pose[3], pose[4], pose[5]));
     }
 
-    // reading eeprom is slow so the camera info is stored and reused.
     RCLCPP_INFO(this->get_logger(), "Discovering camera properties");
     for (int i = 0; i < 4; ++i) {
       if (!this->cam_enabled_[i]) {
@@ -162,24 +132,6 @@ public:
           this->get_logger(), "Skipped cam_%s because it is not enabled",
           std::to_string(i).c_str());
         continue;
-      }
-      {
-        const auto error = this->GetCameraInfo_(i, kCamInfos[i]);
-        if (error) {
-          RCLCPP_FATAL(
-            this->get_logger(), "Failed to get camera info (%s)",
-            error.message().c_str());
-          exit(error.value());
-        }
-      }
-      {
-        const auto error = this->GetClpeCameraInfo_(i, kClpeCamInfos[i]);
-        if (error) {
-          RCLCPP_FATAL(
-            this->get_logger(), "Failed to get camera info (%s)",
-            error.message().c_str());
-          exit(error.value());
-        }
       }
     }
     RCLCPP_INFO(this->get_logger(), "Successfully discovered camera properties");
@@ -193,12 +145,6 @@ public:
       kImagePubs[i] = image_transport::create_publisher(
         this, "cam_" + std::to_string(i) + "/image_raw",
         GetQos_(this->get_parameter(kCamQos[i]).get_value<std::string>()).get_rmw_qos_profile());
-      kInfoPubs[i] = this->create_publisher<sensor_msgs::msg::CameraInfo>(
-        "cam_" + std::to_string(i) + "/camera_info",
-        this->GetQos_(this->get_parameter(kCamInfoQos[i]).get_value<std::string>()));
-      kClpeInfoPubs[i] = this->create_publisher<clpe_ros_msgs::msg::ClpeCameraInfo>(
-        "cam_" + std::to_string(i) + "/clpe_camera_info",
-        this->GetQos_(this->get_parameter(kCamInfoQos[i]).get_value<std::string>()));
     }
 
     // start publishing
@@ -213,9 +159,7 @@ public:
             std::to_string(cam_id).c_str());
 
           // skip all work if there is no subscribers
-          if (kImagePubs[cam_id].getNumSubscribers() == 0 &&
-          kInfoPubs[cam_id]->get_subscription_count() == 0 &&
-          kClpeInfoPubs[cam_id]->get_subscription_count() == 0)
+          if (kImagePubs[cam_id].getNumSubscribers() == 0)
           {
             RCLCPP_DEBUG(
               Me::kNode_->get_logger(),
@@ -231,10 +175,6 @@ public:
           Me::FillImageMsg_(buffer, size, stamp, frame_id, image, Me::kNode_->encoding_);
           const auto time_after_fill = std::chrono::steady_clock::now();
           kImagePubs[cam_id].publish(image);
-          kCamInfos[cam_id].header.frame_id = frame_id;
-          kCamInfos[cam_id].header.stamp = stamp;
-          kInfoPubs[cam_id]->publish(kCamInfos[cam_id]);
-          kClpeInfoPubs[cam_id]->publish(kClpeCamInfos[cam_id]);
           const auto time_after_pub = std::chrono::steady_clock::now();
 
           RCLCPP_DEBUG(
@@ -259,12 +199,6 @@ private:
   // needed because clpe callback does not support user data :(.
   static Me * kNode_;
   static std::unordered_map<int, image_transport::Publisher> kImagePubs;
-  static std::array<rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr, 4> kInfoPubs;
-  static std::array<sensor_msgs::msg::CameraInfo, 4> kCamInfos;
-  static std::array<rclcpp::Publisher<clpe_ros_msgs::msg::ClpeCameraInfo>::SharedPtr,
-    4> kClpeInfoPubs;
-  static std::array<clpe_ros_msgs::msg::ClpeCameraInfo, 4> kClpeCamInfos;
-
   std::string encoding_;
   std::array<bool, 4> cam_enabled_;
 
@@ -309,7 +243,6 @@ private:
         "SENSOR_DATA, HID_DEFAULT (= DEFAULT with depth of 100), EXTRINSICS_DEFAULT (= DEFAULT "
         "with depth of 1 and transient local durability). Default is SYSTEM_DEFAULT.";
       info_qos_desc.read_only = true;
-      this->declare_parameter(kCamInfoQos[i], "SYSTEM_DEFAULT", info_qos_desc);
     }
     {
       rcl_interfaces::msg::ParameterDescriptor desc;
@@ -351,68 +284,6 @@ private:
     tf_msg.rotation.z = quat.z();
     tf_msg.rotation.w = quat.w();
     return tf_msg;
-  }
-
-  /**
-   * Reading the camera's eeprom is slow so callers should cache the result
-   */
-  std::error_code GetCameraInfo_(int cam_id, sensor_msgs::msg::CameraInfo & cam_info)
-  {
-    // reset to defaults
-    cam_info = sensor_msgs::msg::CameraInfo();
-    // calibration may change anytime for self calibrating systems, so we cannot cache the cam
-    // info.
-    cam_info.width = 1920;
-    cam_info.height = 1080;
-    EepromData eeprom_data;
-    const auto result =
-      this->clpe_api.Clpe_GetEepromData(cam_id, reinterpret_cast<unsigned char *>(&eeprom_data));
-    if (result != 0) {
-      return std::error_code(result, GetEepromDataError::get());
-    }
-    switch (eeprom_data.calibration_model) {
-      case CalibrationModel::Jhang:
-        cam_info.distortion_model = sensor_msgs::distortion_models::PLUMB_BOB;
-        break;
-      case CalibrationModel::FishEye:
-        cam_info.distortion_model = sensor_msgs::distortion_models::EQUIDISTANT;
-        break;
-    }
-    cam_info.k = {eeprom_data.fx, 0, eeprom_data.cx, 0, eeprom_data.fy, eeprom_data.cy, 0, 0, 1};
-    cam_info.d = {eeprom_data.k1, eeprom_data.k2, eeprom_data.p1,
-      eeprom_data.p2, eeprom_data.k3, eeprom_data.k4};
-    cam_info.p = {
-      eeprom_data.fx, 0, eeprom_data.cx, 0,
-      0, eeprom_data.fy, eeprom_data.cy, 0,
-      0, 0, 1, 0
-    };
-    return kNoError;
-  }
-
-  std::error_code GetClpeCameraInfo_(int cam_id, clpe_ros_msgs::msg::ClpeCameraInfo & msg)
-  {
-    EepromData eeprom_data;
-    const auto result =
-      this->clpe_api.Clpe_GetEepromData(cam_id, reinterpret_cast<unsigned char *>(&eeprom_data));
-    if (result != 0) {
-      return std::error_code(result, GetEepromDataError::get());
-    }
-
-    msg.calibration_model = static_cast<uint32_t>(eeprom_data.calibration_model);
-    msg.fx = eeprom_data.fx;
-    msg.fy = eeprom_data.fy;
-    msg.cx = eeprom_data.cx;
-    msg.cy = eeprom_data.cy;
-    msg.k1 = eeprom_data.k1;
-    msg.k2 = eeprom_data.k2;
-    msg.k3 = eeprom_data.k3;
-    msg.k4 = eeprom_data.k4;
-    msg.rms = eeprom_data.rms;
-    msg.fov = eeprom_data.fov;
-    msg.p1 = eeprom_data.p1;
-    msg.p2 = eeprom_data.p2;
-    msg.production_date = std::string(eeprom_data.production_date);
-    return kNoError;
   }
 
   static void FillImageMsg_(
@@ -498,19 +369,4 @@ ClpeNode<ClpeClientApi> * ClpeNode<ClpeClientApi>::kNode_;
 
 template<typename ClpeClientApi>
 std::unordered_map<int, image_transport::Publisher> ClpeNode<ClpeClientApi>::kImagePubs;
-
-template<typename ClpeClientApi>
-std::array<rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr, 4>
-ClpeNode<ClpeClientApi>::kInfoPubs;
-
-template<typename ClpeClientApi>
-std::array<sensor_msgs::msg::CameraInfo, 4> ClpeNode<ClpeClientApi>::kCamInfos;
-
-template<typename ClpeClientApi>
-std::array<rclcpp::Publisher<clpe_ros_msgs::msg::ClpeCameraInfo>::SharedPtr, 4>
-ClpeNode<ClpeClientApi>::kClpeInfoPubs;
-
-template<typename ClpeClientApi>
-std::array<clpe_ros_msgs::msg::ClpeCameraInfo, 4> ClpeNode<ClpeClientApi>::kClpeCamInfos;
-
 }  // namespace clpe
