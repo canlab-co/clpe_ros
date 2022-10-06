@@ -64,10 +64,6 @@ static constexpr const char* kCamQueueSize[] = { "cam_0_image_queue_size", "cam_
                                                  "cam_2_image_queue_size", "cam_3_image_queue_size" };
 static constexpr const char* kCamLatch[] = { "cam_0_image_latch", "cam_1__image_latch", "cam_2_image_latch",
                                              "cam_3_image_latch" };
-static constexpr const char* kCamInfoLatch[] = { "cam_0_info_latch", "cam_1_info_latch", "cam_2_info_latch",
-                                                 "cam_3_info_latch" };
-static constexpr const char* kCamInfoQueueSize[] = { "cam_0_info_queue_size", "cam_1_info_queue_size",
-                                                     "cam_2_info_queue_size", "cam_3_info_queue_size" };
 
 // TODO: docs say 95 bytes, but reference sheet is 107 bytes
 template <typename ClpeClientApi>
