@@ -13,16 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- */
+*/
 
 #pragma once
 
 #include <system_error>
 
+//==============================================================================
 namespace clpe
 {
 static const std::error_code kNoError(0, std::generic_category());
 
+//==============================================================================
 class ConnectionError : public std::error_category
 {
 public:
@@ -33,21 +35,17 @@ public:
   static constexpr int CannotCreateSocket = -5;
   static constexpr int CannotConnectSocket = -6;
 
-  static const ConnectionError& get()
+  static const ConnectionError & get()
   {
     static const ConnectionError inst;
     return inst;
   }
 
-  const char* name() const noexcept override
-  {
-    return "ConnectionError";
-  }
+  const char * name() const noexcept override {return "ConnectionError";}
 
   std::string message(int code) const override
   {
-    switch (code)
-    {
+    switch (code) {
       case CannotProbeDriver:
         return "cannot probe driver";
       case CannotFindNetwork:
@@ -66,26 +64,23 @@ public:
   }
 };
 
+//==============================================================================
 class StartStreamError : public std::error_category
 {
 public:
   static constexpr int FailToCreateTask = -1;
 
-  static const StartStreamError& get()
+  static const StartStreamError & get()
   {
     static const StartStreamError inst;
     return inst;
   }
 
-  const char* name() const noexcept override
-  {
-    return "StartStreamError";
-  }
+  const char * name() const noexcept override {return "StartStreamError";}
 
   std::string message(int code) const override
   {
-    switch (code)
-    {
+    switch (code) {
       case FailToCreateTask:
         return "failed to create task";
       default:
@@ -94,27 +89,24 @@ public:
   }
 };
 
+//==============================================================================
 class GetFrameError : public std::error_category
 {
 public:
   static constexpr int FrameNotReady = -2;
   static constexpr int InvalidCamId = -3;
 
-  static const GetFrameError& get()
+  static const GetFrameError & get()
   {
     static const GetFrameError inst;
     return inst;
   }
 
-  const char* name() const noexcept override
-  {
-    return "GetFrameError";
-  }
+  const char * name() const noexcept override {return "GetFrameError";}
 
   std::string message(int code) const override
   {
-    switch (code)
-    {
+    switch (code) {
       case FrameNotReady:
         return "frame not ready";
       case InvalidCamId:
@@ -125,6 +117,7 @@ public:
   }
 };
 
+//==============================================================================
 class GetEepromDataError : public std::error_category
 {
 public:
@@ -132,21 +125,17 @@ public:
   static constexpr int FailedCommunication = -3;
   static constexpr int BadChecksum = -4;
 
-  static const GetEepromDataError& get()
+  static const GetEepromDataError & get()
   {
     static const GetEepromDataError inst;
     return inst;
   }
 
-  const char* name() const noexcept override
-  {
-    return "GetEepromDataError";
-  }
+  const char * name() const noexcept override {return "GetEepromDataError";}
 
   std::string message(int code) const override
   {
-    switch (code)
-    {
+    switch (code) {
       case InvalidCamId:
         return "invalid camera id";
       case FailedCommunication:

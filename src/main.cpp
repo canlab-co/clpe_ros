@@ -13,21 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- */
+*/
 
 #include <ClpeClientApi.h>
 
-#include <ros/ros.h>
+#include <rclcpp/rclcpp.hpp>
 
 #include "ClpeNode.hpp"
 
-int main(int argc, char** argv)
+//==============================================================================
+int main(int argc, char ** argv)
 {
-  ros::init(argc, argv, "clpe_node");
+  rclcpp::init(argc, argv);
 
   const auto node = clpe::ClpeNode<ClpeClientApi>::make_shared(ClpeClientApi());
   node->Init();
-  ros::spin();
+  rclcpp::spin(node);
 
   return 0;
 }

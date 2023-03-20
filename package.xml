@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format2.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>clpe_ros</name>
-  <version>0.1.0</version>
+  <version>0.1.1</version>
   <description>ROS driver for CANLAB CLPE-G-NVP2650D</description>
   <license>Apache License 2.0</license>
   <author>Teo Koon Peng</author>
@@ -10,13 +10,19 @@
   <maintainer email="rlatae123@can-lab.co.kr">Taejung Kim</maintainer>
 
   <depend>clpe</depend>
-  <depend>roscpp</depend>
+  <depend>rclcpp</depend>
   <depend>image_transport</depend>
   <depend>geometry_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>cv_bridge</depend>
   <depend>tf2</depend>
+  <depend>rclcpp_components</depend>
   <depend>clpe_ros_msgs</depend>
 
-  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>ament_cmake</build_depend>
+  <buildtool_depend>python3-colcon-common-extensions</buildtool_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
 </package>
