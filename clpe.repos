@@ -1,7 +1,7 @@
 repositories:
-  canlab-co/CLPE_G_NVP2650D_SDK:
+  canlab-co/CLPE_G_AP0202_SDK:
     type: git
-    url: https://github.com/canlab-co/CLPE_G_NVP2650D_SDK.git
+    url: https://github.com/canlab-co/CLPE_G_AP0202_SDK.git
     version: noetic
   canlab-co/clpe_ros_msgs:
     type: git
@@ -10,4 +10,4 @@ repositories:
   canlab-co/clpe_ros:
     type: git
     url: https://github.com/canlab-co/clpe_ros.git
-    version: noetic
+    version: noetic-AP0202

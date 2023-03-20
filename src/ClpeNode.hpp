@@ -23,10 +23,12 @@
 #include <geometry_msgs/Transform.h>
 #include <image_transport/image_transport.h>
 #include <ros/ros.h>
+#include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/distortion_models.h>
 #include <sensor_msgs/image_encodings.h>
 #include <tf2/LinearMath/Quaternion.h>
+#include <clpe_ros_msgs/ClpeCameraInfo.h>
 
 #include "errors.hpp"
 
@@ -54,8 +56,14 @@ static constexpr std::array<const char*, 6> kSupportedEncodings({
     "yuv422",
 });
 
+static constexpr std::array<const char*, 2> kSupportedTimeStamps({
+    "xavier",
+    "local",
+});
+
 static constexpr const char* kPassword = "password";
 static constexpr const char* kEncoding = "encoding";
+static constexpr const char* kTimeStamp = "timestamp";
 static constexpr const char* kCamEnable[] = { "cam_0_enable", "cam_1_enable", "cam_2_enable", "cam_3_enable" };
 static constexpr const char* kCamPose[] = { "cam_0_pose", "cam_1_pose", "cam_2_pose", "cam_3_pose" };
 static constexpr const char* kCamBaseFrame[] = { "cam_0_frame_id", "cam_1_frame_id", "cam_2_frame_id",
@@ -64,8 +72,11 @@ static constexpr const char* kCamQueueSize[] = { "cam_0_image_queue_size", "cam_
                                                  "cam_2_image_queue_size", "cam_3_image_queue_size" };
 static constexpr const char* kCamLatch[] = { "cam_0_image_latch", "cam_1__image_latch", "cam_2_image_latch",
                                              "cam_3_image_latch" };
+static constexpr const char* kCamInfoLatch[] = { "cam_0_info_latch", "cam_1_info_latch", "cam_2_info_latch",
+                                                 "cam_3_info_latch" };
+static constexpr const char* kCamInfoQueueSize[] = { "cam_0_info_queue_size", "cam_1_info_queue_size",
+                                                     "cam_2_info_queue_size", "cam_3_info_queue_size" };
 
-// TODO: docs say 95 bytes, but reference sheet is 107 bytes
 template <typename ClpeClientApi>
 class ClpeNode : public ros::NodeHandle, public std::enable_shared_from_this<ClpeNode<ClpeClientApi>>
 {
@@ -139,13 +150,15 @@ public:
       bool latch = this->param<bool>(kCamLatch[i], false);
       int queue_size = this->param<int>(kCamQueueSize[i], 10);
       kImagePubs[i] = this->transport_->advertise("cam_" + std::to_string(i) + "/image_raw", queue_size, latch);
+      bool info_latch = this->param<bool>(kCamInfoLatch[i], false);
+      bool info_queue_size = this->param<int>(kCamInfoQueueSize[i], 10);
     }
 
     // start publishing
     {
       ROS_INFO("Preparing camera for streaming");
       const auto result = this->clpe_api.Clpe_StartStream(
-          [](unsigned int cam_id, unsigned char* buffer, unsigned int size, struct timeval* frame_us) -> int {
+          [](unsigned int cam_id, unsigned char* buffer, unsigned int size, struct timeval* camera_timeStamp) -> int {
             ROS_DEBUG("got new image for cam_%i", cam_id);
 
             // skip all work if there is no subscribers
@@ -154,12 +167,19 @@ public:
               ROS_DEBUG("skipped publishing for cam_%i because there are no subscribers", cam_id);
               return 0;
             }
-
-            sensor_msgs::Image image;
-            const auto frame_id = Me::kNode_->param<std::string>(kCamBaseFrame[cam_id], "base_link");
-            const ros::Time stamp = ros::Time::now();
-            Me::FillImageMsg_(buffer, size, stamp, frame_id, image, Me::kNode_->encoding_);
-            kImagePubs[cam_id].publish(image);
+ 	    if(Me::kNode_->timestamp_ == "xavier"){
+		    sensor_msgs::Image image;
+		    const auto frame_id = Me::kNode_->param<std::string>(kCamBaseFrame[cam_id], "base_link");
+		    const ros::Time stamp = ros::Time::now();
+		    Me::FillImageMsg_Xavier_(buffer, size, camera_timeStamp, frame_id, image, Me::kNode_->encoding_);
+		    kImagePubs[cam_id].publish(image);
+            }else if(Me::kNode_->timestamp_ != "xavier"){
+		    sensor_msgs::Image image;
+		    const auto frame_id = Me::kNode_->param<std::string>(kCamBaseFrame[cam_id], "base_link");
+		    const ros::Time stamp = ros::Time::now();
+		    Me::FillImageMsg_Local_(buffer, size, stamp, frame_id, image, Me::kNode_->encoding_);
+		    kImagePubs[cam_id].publish(image);
+            }
             return 0;
           },
           static_cast<int>(this->cam_enabled_[0]), static_cast<int>(this->cam_enabled_[1]),
@@ -181,11 +201,13 @@ private:
 
   std::unique_ptr<image_transport::ImageTransport> transport_;
   std::string encoding_;
+  std::string timestamp_;
   std::array<bool, 4> cam_enabled_;
 
   explicit ClpeNode(ClpeClientApi&& clpe_api) : ros::NodeHandle("~"), clpe_api(std::move(clpe_api))
   {
     this->encoding_ = this->GetEncoding_();
+    this->timestamp_ = this->GetTimeStamp_();
     for (int i = 0; i < 4; ++i)
     {
       this->cam_enabled_[i] = this->param(kCamEnable[i], true);
@@ -219,8 +241,30 @@ private:
     return tf_msg;
   }
 
+  static void FillImageMsg_Xavier_(unsigned char* buffer, unsigned int size, struct timeval* camera_timeStamp,
+                            const std::string& frame_id, sensor_msgs::Image& image, const std::string& encoding)
+  {
+    image.header.frame_id = frame_id;
+    // buffer is only valid for 16 frames, since ros2 publish has no real time guarantees, we must
+    // copy the data out to avoid UB.
+    image.data = std::vector<uint8_t>(buffer, buffer + size);
+    image.encoding = sensor_msgs::image_encodings::YUV422;
+    image.width = 1920;
+    image.height = 1080;
+    // assume that each row is same sized.
+    image.step = size / 1080;
+    image.is_bigendian = false;
+    image.header.stamp.sec = camera_timeStamp->tv_sec;
+    image.header.stamp.nsec = (camera_timeStamp->tv_usec) * 1000;
 
-  static void FillImageMsg_(unsigned char* buffer, unsigned int size, const ros::Time& stamp,
+    if (encoding != "yuv422")
+    {
+      auto cv_image = cv_bridge::toCvCopy(image, encoding);
+      cv_image->toImageMsg(image);
+    }
+  }
+  
+  static void FillImageMsg_Local_(unsigned char* buffer, unsigned int size, const ros::Time& stamp,
                             const std::string& frame_id, sensor_msgs::Image& image, const std::string& encoding)
   {
     image.header.frame_id = frame_id;
@@ -241,7 +285,8 @@ private:
       cv_image->toImageMsg(image);
     }
   }
-
+  
+/*
   std::error_code GetCameraImage_(int cam_id, sensor_msgs::Image& image)
   {
     unsigned char* buffer;
@@ -256,7 +301,7 @@ private:
                         image, this->encoding_);
     return kNoError;
   }
-
+*/
   std::string GetEncoding_()
   {
     const auto enc = this->param<std::string>(kEncoding, "yuv422");
@@ -268,6 +313,17 @@ private:
     return enc;
   }
 
+  std::string GetTimeStamp_()
+  {
+    const auto enc = this->param<std::string>(kTimeStamp, "xavier");
+    if (std::find(kSupportedTimeStamps.begin(), kSupportedTimeStamps.end(), enc) == kSupportedTimeStamps.end())
+    {
+      ROS_FATAL("Unsupported timestamp");
+      exit(-1);
+    }
+    return enc;
+  }
+  
   friend class ClpeComponentNode;
 };
 
@@ -276,5 +332,6 @@ ClpeNode<ClpeClientApi>* ClpeNode<ClpeClientApi>::kNode_;
 
 template <typename ClpeClientApi>
 std::unordered_map<int, image_transport::Publisher> ClpeNode<ClpeClientApi>::kImagePubs;
+
 
 }  // namespace clpe
