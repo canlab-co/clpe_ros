@@ -109,7 +109,7 @@ public:
   void Init()
   {
     // FIXME: This requires sudo password!!
-    const auto & password = this->get_parameter(kPassword).get_value<std::string>();
+    const std::string & password = this->get_parameter(kPassword).get_value<std::string>();
     const auto result = this->clpe_api.Clpe_Connection(password);
     if (result != 0) {
       RCLCPP_FATAL(
@@ -404,7 +404,7 @@ private:
 
   std::string GetEncoding_()
   {
-    const auto enc = this->get_parameter(kEncoding).get_value<std::string>();
+    const std::string enc = this->get_parameter(kEncoding).get_value<std::string>();
     if (std::find(kSupportedEncodings.begin(), kSupportedEncodings.end(), enc) ==
       kSupportedEncodings.end())
     {
@@ -416,7 +416,7 @@ private:
 
   std::string GetTimeStamp_()
   {
-    const auto enc = this->get_parameter(kTimeStamp).get_value<std::string>();
+    const std::string enc = this->get_parameter(kTimeStamp).get_value<std::string>();
     if (std::find(kSupportedTimeStamps.begin(), kSupportedTimeStamps.end(), enc) ==
       kSupportedTimeStamps.end())
     {
