@@ -1,7 +1,7 @@
 repositories:
   canlab-co/CLPE_G_AP0202_SDK:
     type: git
-    url: https://github.com/canlab-co/CLPE_G_AP0202_SDK.git
+    url: https://github.com/canlab-co/CLPE_G_CANLAB_SDK.git
     version: main
   canlab-co/clpe_ros_msgs:
     type: git
