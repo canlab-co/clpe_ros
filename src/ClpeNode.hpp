@@ -63,15 +63,23 @@ static constexpr std::array<const char *, 2> kSupportedTimeStamps({
   });
   
 static constexpr const char * kPassword = "password";
+static constexpr const char * kSlave = "slave";
 static constexpr const char * kEncoding = "encoding";
 static constexpr const char * kTimeStamp = "timestamp";
-static constexpr const char * kCamEnable[] = {"cam_0_enable", "cam_1_enable", "cam_2_enable",
-  "cam_3_enable"};
-static constexpr const char * kCamPose[] = {"cam_0_pose", "cam_1_pose", "cam_2_pose", "cam_3_pose"};
-static constexpr const char * kCamBaseFrame[] = {"cam_0_frame_id", "cam_1_frame_id",
-  "cam_2_frame_id", "cam_3_frame_id"};
-static constexpr const char * kCamQos[] = {"cam_0_image_qos", "cam_1_image_qos", "cam_2_image_qos",
-  "cam_3_image_qos"};
+static constexpr const char * kCamEnable[] = {"cam_0_enable", "cam_1_enable", "cam_2_enable", 
+                                              "cam_3_enable", "cam_4_enable", "cam_5_enable", 
+                                              "cam_6_enable", "cam_7_enable"};
+static constexpr const char * kCamPose[] = {"cam_0_pose", "cam_1_pose", "cam_2_pose", 
+                                            "cam_3_pose", "cam_4_pose", "cam_5_pose", 
+                                            "cam_6_pose", "cam_7_pose"};
+static constexpr const char * kCamBaseFrame[] = {"cam_0_frame_id", "cam_1_frame_id", 
+                                                 "cam_2_frame_id", "cam_3_frame_id", 
+                                                 "cam_4_frame_id", "cam_5_frame_id", 
+                                                 "cam_6_frame_id", "cam_7_frame_id"};
+static constexpr const char * kCamQos[] = {"cam_0_image_qos", "cam_1_image_qos", 
+                                           "cam_2_image_qos", "cam_3_image_qos", 
+                                           "cam_4_image_qos", "cam_5_image_qos", 
+                                           "cam_6_image_qos", "cam_7_image_qos"};
 static constexpr const char * kQosSystemDefault = "SYSTEM_DEFAULT";
 static constexpr const char * kQosParameterEvents = "PARAMETER_EVENTS";
 static constexpr const char * kQosServicesDefault = "SERVICES_DEFAULT";
@@ -110,7 +118,9 @@ public:
   {
     // FIXME: This requires sudo password!!
     const std::string & password = this->get_parameter(kPassword).get_value<std::string>();
-    const auto result = this->clpe_api.Clpe_Connection(password);
+    const bool & slave = this->get_parameter(kSlave).get_value<bool>();
+    
+    const auto result = this->clpe_api.Clpe_Connection(password, slave);
     if (result != 0) {
       RCLCPP_FATAL(
         this->get_logger(), "Failed to initiate the clpe network connection (%s)",
@@ -123,7 +133,7 @@ public:
     rclcpp::QoS tf_qos(1);
     tf_qos.reliable();
     tf_qos.transient_local();
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 8; ++i) {
       const auto tf_pub = this->create_publisher<geometry_msgs::msg::Transform>(
         "cam_" + std::to_string(i) + "/tf", tf_qos);
       geometry_msgs::msg::Transform tf_msg;
@@ -131,20 +141,26 @@ public:
       tf_pub->publish(Me::CreateTfMsg_(pose[0], pose[1], pose[2], pose[3], pose[4], pose[5]));
     }
 
+    int* camStat = (int*)calloc(8, sizeof(int));
+    this->clpe_api.Clpe_GetCamStatus(camStat);
+    
     RCLCPP_INFO(this->get_logger(), "Discovering camera properties");
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 8; ++i) {
       if (!this->cam_enabled_[i]) {
         RCLCPP_INFO(
           this->get_logger(), "Skipped cam_%s because it is not enabled",
           std::to_string(i).c_str());
         continue;
       }
+      else {
+        this->cam_enabled_[i] = camStat[i];
+      }
     }
     RCLCPP_INFO(this->get_logger(), "Successfully discovered camera properties");
 
     // create camera publishers
-    kImagePubs.reserve(4);
-    for (int i = 0; i < 4; ++i) {
+    kImagePubs.reserve(8);
+    for (int i = 0; i < 8; ++i) {
       if (!this->cam_enabled_[i]) {
         continue;
       }
@@ -200,8 +216,11 @@ public:
 	  }
 	  return 0;
 	},
-	static_cast<int>(this->cam_enabled_[0]), static_cast<int>(this->cam_enabled_[1]),
-	static_cast<int>(this->cam_enabled_[2]), static_cast<int>(this->cam_enabled_[3]), 0);
+	static_cast<int>(this->cam_enabled_[0]), static_cast<int>(this->cam_enabled_[1]), 
+	static_cast<int>(this->cam_enabled_[2]), static_cast<int>(this->cam_enabled_[3]), 
+	static_cast<int>(this->cam_enabled_[4]), static_cast<int>(this->cam_enabled_[5]), 
+	static_cast<int>(this->cam_enabled_[6]), static_cast<int>(this->cam_enabled_[7]), 
+	0);
 	
       if (result != 0) {
         const std::error_code error(result, clpe::StartStreamError::get());
@@ -218,7 +237,7 @@ private:
   static std::unordered_map<int, image_transport::Publisher> kImagePubs;
   std::string encoding_;
   std::string timestamp_;
-  std::array<bool, 4> cam_enabled_;
+  std::array<bool, 8> cam_enabled_;
 
   explicit ClpeNode(ClpeClientApi && clpe_api, const rclcpp::NodeOptions & options)
   : rclcpp::Node("clpe", options), clpe_api(std::move(clpe_api))
@@ -230,7 +249,13 @@ private:
       desc.read_only = true;
       this->declare_parameter(kPassword, rclcpp::ParameterValue(), desc);
     }
-    for (int i = 0; i < 4; ++i) {
+    {
+      rcl_interfaces::msg::ParameterDescriptor desc;
+      desc.description = "Check slave";
+      desc.read_only = true;
+      this->declare_parameter(kSlave, rclcpp::ParameterValue(), desc);
+    }
+    for (int i = 0; i < 8; ++i) {
       rcl_interfaces::msg::ParameterDescriptor enable_desc;
       enable_desc.description = "Enable camera";
       this->declare_parameter(kCamEnable[i], true, enable_desc);
@@ -278,10 +303,10 @@ private:
       desc.read_only = true;
       this->declare_parameter(kTimeStamp, "xavier", desc);
     }
-    
+   
     this->encoding_ = this->GetEncoding_();
     this->timestamp_ = this->GetTimeStamp_();
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 8; ++i) {
       this->cam_enabled_[i] = this->get_parameter(kCamEnable[i]).get_value<bool>();
     }
   }
@@ -402,9 +427,12 @@ private:
     return rclcpp::SystemDefaultsQoS();
   }
 
+
+  
   std::string GetEncoding_()
   {
     const std::string enc = this->get_parameter(kEncoding).get_value<std::string>();
+    //RCLCPP_FATAL(this->get_logger(), "******Unsupported encoding******** %s", enc.c_str());
     if (std::find(kSupportedEncodings.begin(), kSupportedEncodings.end(), enc) ==
       kSupportedEncodings.end())
     {

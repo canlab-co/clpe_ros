@@ -50,7 +50,31 @@ parameters = {
   "cam_3_frame_id": "cam_3_link",
   "cam_3_image_qos": "SENSOR_DATA",
   "cam_3_info_qos": "SYSTEM_DEFAULT",
-  "cam_3_pose": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+  "cam_3_pose": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+  
+  "cam_4_enable": True,
+  "cam_4_frame_id": "cam_4_link",
+  "cam_4_image_qos": "SENSOR_DATA",
+  "cam_4_info_qos": "SYSTEM_DEFAULT",
+  "cam_4_pose": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+  
+  "cam_5_enable": True,
+  "cam_5_frame_id": "cam_5_link",
+  "cam_5_image_qos": "SENSOR_DATA",
+  "cam_5_info_qos": "SYSTEM_DEFAULT",
+  "cam_5_pose": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+  
+  "cam_6_enable": True,
+  "cam_6_frame_id": "cam_6_link",
+  "cam_6_image_qos": "SENSOR_DATA",
+  "cam_6_info_qos": "SYSTEM_DEFAULT",
+  "cam_6_pose": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+  
+  "cam_7_enable": True,
+  "cam_7_frame_id": "cam_7_link",
+  "cam_7_image_qos": "SENSOR_DATA",
+  "cam_7_info_qos": "SYSTEM_DEFAULT",
+  "cam_7_pose": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 }
 
 def generate_launch_description():
@@ -58,6 +82,10 @@ def generate_launch_description():
     # args that can be set from the command line or a default will be used
     password_arg = DeclareLaunchArgument(
         "password", default_value=TextSubstitution(text="0")
+    )
+    
+    slave_arg = DeclareLaunchArgument(
+        "slave", default_value=TextSubstitution(text="n")
     )
 
     encoding_arg = DeclareLaunchArgument(
@@ -74,14 +102,16 @@ def generate_launch_description():
             executable='clpe_ros',
             name='clpe_ros',
             parameters=[parameters, {
-                "encoding": LaunchConfiguration('encoding'),
                 "password": LaunchConfiguration('password'),
+                "slave": LaunchConfiguration('slave'),
+                "encoding": LaunchConfiguration('encoding'),
                 "timestamp": LaunchConfiguration('timestamp'),
             }]
         )
 
     return LaunchDescription([
         password_arg,
+        slave_arg,
         encoding_arg,
         timestamp_arg,
         canlab_node,
