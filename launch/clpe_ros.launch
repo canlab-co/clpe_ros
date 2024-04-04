@@ -1,12 +1,14 @@
 <?xml version="1.0"?>
 <launch>
   <arg name="password" default=""/>
+  <arg name="slave" default="n"/>
   <arg name="encoding" default="yuv422"/>
   <arg name="timestamp" default="xavier"/>
   <arg name="config" default="$(find clpe_ros)/config/clpe_config.yaml"/>
 
   <node name="clpe_ros" pkg="clpe_ros" type="clpe_ros" output="screen">
     <param name="password" value="$(arg password)"/>
+    <param name="slave" value="$(arg slave)"/>
     <param name="encoding" value="$(arg encoding)"/>
     <param name="timestamp" value="$(arg timestamp)"/>
     <rosparam command="load"

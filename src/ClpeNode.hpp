@@ -40,6 +40,11 @@ enum class CalibrationModel : uint32_t
   FishEye = 1,
 };
 
+static constexpr std::array<const char*, 2> kSupportedSlaves({
+    "y",
+    "n",
+});
+
 // Supported types by cv_bridge
 // https://github.com/ros-perception/vision_opencv/blob/c791220cefd0abf02c6719e2ce0fea465857a88e/cv_bridge/include/cv_bridge/cv_bridge.h#L202
 // using array instead of enum to allow iteration.
@@ -62,20 +67,35 @@ static constexpr std::array<const char*, 2> kSupportedTimeStamps({
 });
 
 static constexpr const char* kPassword = "password";
+static constexpr const char* kSlave = "slave";
 static constexpr const char* kEncoding = "encoding";
 static constexpr const char* kTimeStamp = "timestamp";
-static constexpr const char* kCamEnable[] = { "cam_0_enable", "cam_1_enable", "cam_2_enable", "cam_3_enable" };
-static constexpr const char* kCamPose[] = { "cam_0_pose", "cam_1_pose", "cam_2_pose", "cam_3_pose" };
-static constexpr const char* kCamBaseFrame[] = { "cam_0_frame_id", "cam_1_frame_id", "cam_2_frame_id",
-                                                 "cam_3_frame_id" };
-static constexpr const char* kCamQueueSize[] = { "cam_0_image_queue_size", "cam_1_image_queue_size",
-                                                 "cam_2_image_queue_size", "cam_3_image_queue_size" };
-static constexpr const char* kCamLatch[] = { "cam_0_image_latch", "cam_1__image_latch", "cam_2_image_latch",
-                                             "cam_3_image_latch" };
-static constexpr const char* kCamInfoLatch[] = { "cam_0_info_latch", "cam_1_info_latch", "cam_2_info_latch",
-                                                 "cam_3_info_latch" };
-static constexpr const char* kCamInfoQueueSize[] = { "cam_0_info_queue_size", "cam_1_info_queue_size",
-                                                     "cam_2_info_queue_size", "cam_3_info_queue_size" };
+static constexpr const char* kCamEnable[] = { "cam_0_enable", "cam_1_enable", "cam_2_enable", 
+                                              "cam_3_enable", "cam_4_enable", "cam_5_enable", 
+                                              "cam_6_enable", "cam_7_enable" };
+static constexpr const char* kCamPose[] = { "cam_0_pose", "cam_1_pose", "cam_2_pose", 
+                                            "cam_3_pose", "cam_4_pose", "cam_5_pose", 
+                                            "cam_6_pose", "cam_7_pose" };
+static constexpr const char* kCamBaseFrame[] = { "cam_0_frame_id", "cam_1_frame_id", 
+                                                 "cam_2_frame_id", "cam_3_frame_id", 
+                                                 "cam_4_frame_id", "cam_5_frame_id", 
+                                                 "cam_6_frame_id", "cam_7_frame_id" };
+static constexpr const char* kCamQueueSize[] = { "cam_0_image_queue_size", "cam_1_image_queue_size", 
+                                                 "cam_2_image_queue_size", "cam_3_image_queue_size", 
+                                                 "cam_4_image_queue_size", "cam_5_image_queue_size", 
+                                                 "cam_6_image_queue_size", "cam_7_image_queue_size" };
+static constexpr const char* kCamLatch[] = { "cam_0_image_latch", "cam_1_image_latch", 
+                                             "cam_2_image_latch", "cam_3_image_latch", 
+                                             "cam_4_image_latch", "cam_5_image_latch", 
+                                             "cam_6_image_latch", "cam_7_image_latch" };
+static constexpr const char* kCamInfoLatch[] = { "cam_0_info_latch", "cam_1_info_latch", 
+                                                 "cam_2_info_latch", "cam_3_info_latch", 
+                                                 "cam_4_info_latch", "cam_5_info_latch", 
+                                                 "cam_6_info_latch", "cam_7_info_latch" };
+static constexpr const char* kCamInfoQueueSize[] = { "cam_0_info_queue_size", "cam_1_info_queue_size", 
+                                                     "cam_2_info_queue_size", "cam_3_info_queue_size", 
+                                                     "cam_4_info_queue_size", "cam_5_info_queue_size", 
+                                                     "cam_6_info_queue_size", "cam_7_info_queue_size" };
 
 template <typename ClpeClientApi>
 class ClpeNode : public ros::NodeHandle, public std::enable_shared_from_this<ClpeNode<ClpeClientApi>>
@@ -111,7 +131,12 @@ public:
       ROS_FATAL("Password is required");
       exit(-1);
     }
-    const auto result = this->clpe_api.Clpe_Connection(password);
+    
+    int S_slave;
+    if (Me::kNode_->slave_ == "y") S_slave = 1;
+    else if (Me::kNode_->slave_ == "n") S_slave = 0;
+    
+    const auto result = this->clpe_api.Clpe_Connection(password, S_slave);
     if (result != 0)
     {
       ROS_FATAL("Failed to initiate the clpe network connection (%s)", ConnectionError::get().message(result).c_str());
@@ -119,29 +144,36 @@ public:
     }
 
     // publish tf
-    for (int i = 0; i < 4; ++i)
+    for (int i = 0; i < 8; ++i)
     {
       const auto tf_pub = this->advertise<geometry_msgs::Transform>("cam_" + std::to_string(i) + "/tf", 1, true);
       geometry_msgs::Transform tf_msg;
       auto pose = this->GetPoseParam_(i);
       tf_pub.publish(Me::CreateTfMsg_(pose[0], pose[1], pose[2], pose[3], pose[4], pose[5]));
     }
-
+    
+    int* camStat = (int*)calloc(8, sizeof(int));
+    this->clpe_api.Clpe_GetCamStatus(camStat);
+    
     // reading eeprom is slow so the camera info is stored and reused.
     ROS_INFO("Discovering camera properties");
-    for (int i = 0; i < 4; ++i)
+    for (int i = 0; i < 8; ++i)
     {
       if (!this->cam_enabled_[i])
       {
         ROS_INFO("Skipped cam_%i  because it is not enabled", i);
         continue;
       }
+      else
+      {
+        this->cam_enabled_[i] = camStat[i];
+      }
     }
     ROS_INFO("Successfully discovered camera properties");
 
     // create camera publishers
-    kImagePubs.reserve(4);
-    for (int i = 0; i < 4; ++i)
+    kImagePubs.reserve(8);
+    for (int i = 0; i < 8; ++i)
     {
       if (!this->cam_enabled_[i])
       {
@@ -170,7 +202,6 @@ public:
  	    if(Me::kNode_->timestamp_ == "xavier"){
 		    sensor_msgs::Image image;
 		    const auto frame_id = Me::kNode_->param<std::string>(kCamBaseFrame[cam_id], "base_link");
-		    const ros::Time stamp = ros::Time::now();
 		    Me::FillImageMsg_Xavier_(buffer, size, camera_timeStamp, frame_id, image, Me::kNode_->encoding_);
 		    kImagePubs[cam_id].publish(image);
             }else if(Me::kNode_->timestamp_ != "xavier"){
@@ -182,8 +213,11 @@ public:
             }
             return 0;
           },
-          static_cast<int>(this->cam_enabled_[0]), static_cast<int>(this->cam_enabled_[1]),
-          static_cast<int>(this->cam_enabled_[2]), static_cast<int>(this->cam_enabled_[3]), 0);
+          static_cast<int>(this->cam_enabled_[0]), static_cast<int>(this->cam_enabled_[1]), 
+          static_cast<int>(this->cam_enabled_[2]), static_cast<int>(this->cam_enabled_[3]), 
+          static_cast<int>(this->cam_enabled_[4]), static_cast<int>(this->cam_enabled_[5]), 
+          static_cast<int>(this->cam_enabled_[6]), static_cast<int>(this->cam_enabled_[7]), 
+          0);
       if (result != 0)
       {
         const std::error_code error(result, clpe::StartStreamError::get());
@@ -200,15 +234,17 @@ private:
   static std::unordered_map<int, image_transport::Publisher> kImagePubs;
 
   std::unique_ptr<image_transport::ImageTransport> transport_;
+  std::string slave_;
   std::string encoding_;
   std::string timestamp_;
-  std::array<bool, 4> cam_enabled_;
+  std::array<bool, 8> cam_enabled_;
 
   explicit ClpeNode(ClpeClientApi&& clpe_api) : ros::NodeHandle("~"), clpe_api(std::move(clpe_api))
   {
+    this->slave_ = this->GetSlave_();
     this->encoding_ = this->GetEncoding_();
     this->timestamp_ = this->GetTimeStamp_();
-    for (int i = 0; i < 4; ++i)
+    for (int i = 0; i < 8; ++i)
     {
       this->cam_enabled_[i] = this->param(kCamEnable[i], true);
     }
@@ -302,6 +338,17 @@ private:
     return kNoError;
   }
 */
+  std::string GetSlave_()
+  {
+    const auto slv = this->param<std::string>(kSlave, "n");
+    if (std::find(kSupportedSlaves.begin(), kSupportedSlaves.end(), slv) == kSupportedSlaves.end())
+    {
+      ROS_FATAL("Unsupported slave");
+      exit(-1);
+    }
+    return slv;
+  }
+  
   std::string GetEncoding_()
   {
     const auto enc = this->param<std::string>(kEncoding, "yuv422");

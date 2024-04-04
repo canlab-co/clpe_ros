@@ -29,3 +29,35 @@ cam_3_image_queue_size: 10
 cam_3_image_latch: false
 cam_3_info_queue_size: 10
 cam_3_info_latch: false
+
+cam_4_enable: true
+cam_4_frame_id: "cam_4_link"
+cam_4_pose: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+cam_4_image_queue_size: 10
+cam_4_image_latch: false
+cam_4_info_queue_size: 10
+cam_4_info_latch: false
+
+cam_5_enable: true
+cam_5_frame_id: "cam_5_link"
+cam_5_pose: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+cam_5_image_queue_size: 10
+cam_5_image_latch: false
+cam_5_info_queue_size: 10
+cam_5_info_latch: false
+
+cam_6_enable: true
+cam_6_frame_id: "cam_6_link"
+cam_6_pose: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+cam_6_image_queue_size: 10
+cam_6_image_latch: false
+cam_6_info_queue_size: 10
+cam_6_info_latch: false
+
+cam_7_enable: true
+cam_7_frame_id: "cam_7_link"
+cam_7_pose: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+cam_7_image_queue_size: 10
+cam_7_image_latch: false
+cam_7_info_queue_size: 10
+cam_7_info_latch: false
