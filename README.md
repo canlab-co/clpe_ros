@@ -10,7 +10,7 @@ This drivers exposes camera images and information from CLPE-G-Series as ROS mes
 
 Requirements:
   * CANLAB CLPE-G-Series with supplied PC running [Ubuntu 20.04](https://releases.ubuntu.com/20.04/)
-  * [CLPE_G_Series_SDK](https://github.com/canlab-co/clpe_ros_8ch_test/tree/noetic_sdk)
+  * [CLPE_G_Series_SDK](https://github.com/canlab-co/CLPE_G_CANLAB_SDK/tree/noetic)
   * [ROS 1 Noetic](http://wiki.ros.org/noetic)
 
 > Note: It is strongly recommended to install `Ubuntu 20.04` on the PC shipped with CLPE-G-Series. This way ROS 1 binaries can be [installed as debian packages](http://wiki.ros.org/noetic/Installation/Ubuntu). If the PC is running `Ubuntu 18.04`, ROS 1 will need to be [built from source](http://wiki.ros.org/noetic/Installation/Source) which is not officially supported on `Ubuntu 18.04`.
@@ -36,7 +36,7 @@ Create workspace
 ```bash
 mkdir -p ~/ws_clpe/src
 cd ~/ws_clpe/
-wget https://raw.githubusercontent.com/canlab-co/clpe_ros_8ch_test/noetic/clpe.repos
+wget https://raw.githubusercontent.com/canlab-co/clpe_ros/noetic/clpe.repos
 vcs import src < clpe.repos
 ```
 
@@ -64,7 +64,7 @@ catkin_make install --cmake-args -DCMAKE_BUILD_TYPE=Release -DCLPE_ROS_BUILD_BEN
 ```bash
 cd ~/ws_clpe
 source install/setup.bash
-roslaunch clpe_ros clpe_ros.launch password:=<sudo-password> slave:=y encoding:=yuv422 timestamp:=xavier
+roslaunch clpe_ros clpe_ros.launch password:=<sudo-password> slave:=n encoding:=yuv422 timestamp:=xavier
 ```
 
 > Note: If `sudo-password` is a number, say `42`, you should pass it as `password:=\'42\'`\
