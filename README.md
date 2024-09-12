@@ -64,7 +64,10 @@ catkin_make install --cmake-args -DCMAKE_BUILD_TYPE=Release -DCLPE_ROS_BUILD_BEN
 ```bash
 cd ~/ws_clpe
 source install/setup.bash
+** UYVY **
 roslaunch clpe_ros clpe_ros.launch password:=<sudo-password> slave:=n encoding:=yuv422 timestamp:=xavier
+** JPEG **
+roslaunch clpe_ros clpe_ros.launch password:=<sudo-password> slave:=n encoding:=jpeg timestamp:=local
 ```
 
 > Note: If `sudo-password` is a number, say `42`, you should pass it as `password:=\'42\'`\
@@ -91,7 +94,7 @@ The driver supports the following ROS parameters to configure its behavior. The 
 |-|-|-|
 | password | sudo password | *\*Required\** |
 | slave | check slave, supported arguments are: y, n. Defaults to n. | n |
-| encoding | Image encoding, supported formats are: bgr8, bgra8, rgb8, rgba8, mono16, yuv422. Defaults to yuv422. Note that encodings other than yuv422 incurs conversion overhead. | yuv422 |
+| encoding | Image encoding, supported formats are: bgr8, bgra8, rgb8, rgba8, mono16, yuv422, jpeg. Defaults to yuv422. Note that encodings other than yuv422 incurs conversion overhead. | yuv422 |
 | timestamp | Image timestamp, supported formats are: xavier, local. Defaults to xavier. | xavier |
 | cam_{n}_enable | Enable camera | true |
 | cam_{n}_pose | Pose relative to the base, 6 values corresponding to [x, y, z, roll, pitch, yaw] | [0,0,0,0,0,0] |
