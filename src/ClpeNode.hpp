@@ -48,7 +48,7 @@ static constexpr std::array<const char*, 2> kSupportedSlaves({
 // Supported types by cv_bridge
 // https://github.com/ros-perception/vision_opencv/blob/c791220cefd0abf02c6719e2ce0fea465857a88e/cv_bridge/include/cv_bridge/cv_bridge.h#L202
 // using array instead of enum to allow iteration.
-static constexpr std::array<const char*, 6> kSupportedEncodings({
+static constexpr std::array<const char*, 7> kSupportedEncodings({
     // cv_bridge only supports converting to from color to mono of the same channels, so "mono8"
     // is not supported.
     // "mono8"
@@ -57,6 +57,7 @@ static constexpr std::array<const char*, 6> kSupportedEncodings({
     "rgb8",
     "rgba8",
     "mono16",
+    "jpeg",
     // camera encoding
     "yuv422",
 });
@@ -172,7 +173,14 @@ public:
     ROS_INFO("Successfully discovered camera properties");
 
     // create camera publishers
-    kImagePubs.reserve(8);
+    if(Me::kNode_->encoding_ == "jpeg"){
+		this->clpe_api.Clpe_SelectFormat(0);
+		jpeg_pub.reserve(8);
+    }else{
+		this->clpe_api.Clpe_SelectFormat(1);
+		kImagePubs.reserve(8);		
+    }
+    
     for (int i = 0; i < 8; ++i)
     {
       if (!this->cam_enabled_[i])
@@ -181,7 +189,8 @@ public:
       }
       bool latch = this->param<bool>(kCamLatch[i], false);
       int queue_size = this->param<int>(kCamQueueSize[i], 10);
-      kImagePubs[i] = this->transport_->advertise("cam_" + std::to_string(i) + "/image_raw", queue_size, latch);
+      if(Me::kNode_->encoding_ == "jpeg") jpeg_pub[i] = this->advertise<sensor_msgs::CompressedImage>("cam_" + std::to_string(i) + "/compressed", queue_size, latch);
+      else kImagePubs[i] = this->transport_->advertise("cam_" + std::to_string(i) + "/image_raw", queue_size, latch);
       bool info_latch = this->param<bool>(kCamInfoLatch[i], false);
       bool info_queue_size = this->param<int>(kCamInfoQueueSize[i], 10);
     }
@@ -194,10 +203,21 @@ public:
             ROS_DEBUG("got new image for cam_%i", cam_id);
 
             // skip all work if there is no subscribers
-            if (kImagePubs[cam_id].getNumSubscribers() == 0)
+            if(Me::kNode_->encoding_ == "jpeg")
             {
-              ROS_DEBUG("skipped publishing for cam_%i because there are no subscribers", cam_id);
-              return 0;
+              if (jpeg_pub[cam_id].getNumSubscribers() == 0)
+              {
+                ROS_DEBUG("skipped publishing for cam_%i because there are no subscribers", cam_id);
+                return 0;
+              }
+            }
+            else
+            {
+              if (kImagePubs[cam_id].getNumSubscribers() == 0)
+              {
+                ROS_DEBUG("skipped publishing for cam_%i because there are no subscribers", cam_id);
+                return 0;
+              }
             }
  	    if(Me::kNode_->timestamp_ == "xavier"){
 		    sensor_msgs::Image image;
@@ -205,11 +225,19 @@ public:
 		    Me::FillImageMsg_Xavier_(buffer, size, camera_timeStamp, frame_id, image, Me::kNode_->encoding_);
 		    kImagePubs[cam_id].publish(image);
             }else if(Me::kNode_->timestamp_ != "xavier"){
-		    sensor_msgs::Image image;
-		    const auto frame_id = Me::kNode_->param<std::string>(kCamBaseFrame[cam_id], "base_link");
-		    const ros::Time stamp = ros::Time::now();
-		    Me::FillImageMsg_Local_(buffer, size, stamp, frame_id, image, Me::kNode_->encoding_);
-		    kImagePubs[cam_id].publish(image);
+            	        if(Me::kNode_->encoding_ == "jpeg"){	     
+				sensor_msgs::CompressedImagePtr image(new sensor_msgs::CompressedImage());
+				const auto frame_id = Me::kNode_->param<std::string>(kCamBaseFrame[cam_id], "base_link");
+				const ros::Time stamp = ros::Time::now();
+				Me::FillImageMsg_Compressed_(buffer, size, stamp, frame_id, image);
+				jpeg_pub[cam_id].publish(image);
+	        	}else{
+			        sensor_msgs::Image image;
+			        const auto frame_id = Me::kNode_->param<std::string>(kCamBaseFrame[cam_id], "base_link");
+			        const ros::Time stamp = ros::Time::now();
+			        Me::FillImageMsg_Local_(buffer, size, stamp, frame_id, image, Me::kNode_->encoding_);
+			        kImagePubs[cam_id].publish(image);
+	    	       }
             }
             return 0;
           },
@@ -232,7 +260,7 @@ private:
   // needed because clpe callback does not support user data :(.
   static Me* kNode_;
   static std::unordered_map<int, image_transport::Publisher> kImagePubs;
-
+  static std::unordered_map<int, ros::Publisher> jpeg_pub;
   std::unique_ptr<image_transport::ImageTransport> transport_;
   std::string slave_;
   std::string encoding_;
@@ -322,6 +350,15 @@ private:
     }
   }
   
+  static void FillImageMsg_Compressed_(unsigned char* buffer, unsigned int size, const ros::Time& stamp,
+  				 const std::string& frame_id, sensor_msgs::CompressedImagePtr& image)
+ {
+    image->header.frame_id = frame_id;
+    image->format = "jpeg";
+    image->data.resize(size);
+    std::copy(buffer, (buffer) + (size), image->data.begin());
+ }
+  
 /*
   std::error_code GetCameraImage_(int cam_id, sensor_msgs::Image& image)
   {
@@ -340,15 +377,15 @@ private:
 */
   std::string GetSlave_()
   {
-    const auto slv = this->param<std::string>(kSlave, "n");
-    if (std::find(kSupportedSlaves.begin(), kSupportedSlaves.end(), slv) == kSupportedSlaves.end())
+    const auto enc = this->param<std::string>(kSlave, "n");
+    if (std::find(kSupportedSlaves.begin(), kSupportedSlaves.end(), enc) == kSupportedSlaves.end())
     {
-      ROS_FATAL("Unsupported slave");
+      ROS_FATAL("Unsupported Slave");
       exit(-1);
     }
-    return slv;
+    return enc;
   }
-  
+
   std::string GetEncoding_()
   {
     const auto enc = this->param<std::string>(kEncoding, "yuv422");
@@ -378,7 +415,8 @@ template <typename ClpeClientApi>
 ClpeNode<ClpeClientApi>* ClpeNode<ClpeClientApi>::kNode_;
 
 template <typename ClpeClientApi>
+std::unordered_map<int, ros::Publisher> ClpeNode<ClpeClientApi>::jpeg_pub;
+
+template <typename ClpeClientApi>
 std::unordered_map<int, image_transport::Publisher> ClpeNode<ClpeClientApi>::kImagePubs;
-
-
 }  // namespace clpe
