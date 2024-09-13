@@ -28,6 +28,7 @@
 #include <sensor_msgs/distortion_models.hpp>
 #include <sensor_msgs/image_encodings.hpp>
 #include <sensor_msgs/msg/image.hpp>
+#include <sensor_msgs/msg/compressed_image.hpp>
 
 #include "errors.hpp"
 
@@ -44,7 +45,7 @@ enum class CalibrationModel : uint32_t
 // Supported types by cv_bridge
 // https://github.com/ros-perception/vision_opencv/blob/c791220cefd0abf02c6719e2ce0fea465857a88e/cv_bridge/include/cv_bridge/cv_bridge.h#L202
 // using array instead of enum to allow iteration.
-static constexpr std::array<const char *, 6> kSupportedEncodings({
+static constexpr std::array<const char *, 7> kSupportedEncodings({
     // cv_bridge only supports converting to from color to mono of the same channels, so "mono8"
     // is not supported.
     // "mono8"
@@ -53,6 +54,7 @@ static constexpr std::array<const char *, 6> kSupportedEncodings({
     "rgb8",
     "rgba8",
     "mono16",
+    "jpeg",
     // camera encoding
     "yuv422",
   });
@@ -159,14 +161,27 @@ public:
     RCLCPP_INFO(this->get_logger(), "Successfully discovered camera properties");
 
     // create camera publishers
-    kImagePubs.reserve(8);
+    if(Me::kNode_->encoding_ == "jpeg") {
+      this->clpe_api.Clpe_SelectFormat(0);
+      jpeg_pub.reserve(8);
+    }
+    else {
+      this->clpe_api.Clpe_SelectFormat(1);
+      kImagePubs.reserve(8);
+    }
+    
     for (int i = 0; i < 8; ++i) {
       if (!this->cam_enabled_[i]) {
         continue;
       }
-      kImagePubs[i] = image_transport::create_publisher(
-        this, "cam_" + std::to_string(i) + "/image_raw",
-        GetQos_(this->get_parameter(kCamQos[i]).get_value<std::string>()).get_rmw_qos_profile());
+      if(Me::kNode_->encoding_ == "jpeg") {
+        jpeg_pub[i] = this->create_publisher<sensor_msgs::msg::CompressedImage>("cam_" + std::to_string(i) + "/compressed", 1);
+      }
+      else {
+        kImagePubs[i] = image_transport::create_publisher(
+          this, "cam_" + std::to_string(i) + "/image_raw",
+          GetQos_(this->get_parameter(kCamQos[i]).get_value<std::string>()).get_rmw_qos_profile());
+      }
     }
 
     // start publishing
@@ -180,13 +195,26 @@ public:
 	    std::to_string(cam_id).c_str());
 
 	  // skip all work if there is no subscribers
-	  if (kImagePubs[cam_id].getNumSubscribers() == 0)
-	  {
-	    RCLCPP_DEBUG(
-	      Me::kNode_->get_logger(),
-	      "skipped publishing for cam_%s because there are no subscribers",
-	      std::to_string(cam_id).c_str());
-	    return 0;
+	  if(Me::kNode_->encoding_ == "jpeg") {
+	    size_t subscriber_cnt = jpeg_pub[cam_id]->get_subscription_count();
+	    if(subscriber_cnt == 0)
+	    {
+	      RCLCPP_DEBUG(
+	        Me::kNode_->get_logger(),
+	        "skipped publishing for cam_%s because there are no subscribers",
+	        std::to_string(cam_id).c_str());
+	      return 0;
+	    }
+	  }
+	  else {
+	    if(kImagePubs[cam_id].getNumSubscribers() == 0)
+	    {
+	      RCLCPP_DEBUG(
+	        Me::kNode_->get_logger(),
+	        "skipped publishing for cam_%s because there are no subscribers",
+	        std::to_string(cam_id).c_str());
+	      return 0;
+	    }
 	  }
 	  
      	  if(Me::kNode_->timestamp_ == "xavier"){
@@ -197,22 +225,46 @@ public:
 		  kImagePubs[cam_id].publish(image);
 		  
 	  }else if(Me::kNode_->timestamp_ != "xavier"){
-  		  const auto start_time = std::chrono::steady_clock::now();
-  		  
-  		  sensor_msgs::msg::Image image;
-		  const auto frame_id =
-		  Me::kNode_->get_parameter(kCamBaseFrame[cam_id]).get_value<std::string>();
-		  const rclcpp::Time stamp = Me::kNode_->get_clock()->now();
-		  Me::FillImageMsg_Local_(buffer, size, stamp, frame_id, image, Me::kNode_->encoding_);
-		  const auto time_after_fill = std::chrono::steady_clock::now();
-		  kImagePubs[cam_id].publish(image);
-		  const auto time_after_pub = std::chrono::steady_clock::now();
+  		  if(Me::kNode_->encoding_ == "jpeg") {
+  		    const auto start_time = std::chrono::steady_clock::now();
+  		    
+  		    sensor_msgs::msg::CompressedImage image;
+		    const auto frame_id =
+		    Me::kNode_->get_parameter(kCamBaseFrame[cam_id]).get_value<std::string>();
+		    const rclcpp::Time stamp = Me::kNode_->get_clock()->now();
+		    Me::FillImageMsg_Compressed_(buffer, size, stamp, frame_id, image);
+		    
+		    const auto time_after_fill = std::chrono::steady_clock::now();
+		    
+		    jpeg_pub[cam_id]->publish(std::move(image));
 
-	    	  RCLCPP_DEBUG(
-		  Me::kNode_->get_logger(),
-		  "local Time to fill msg: %ld us. Time to publish: %ld us",
-		  (time_after_fill - start_time).count() / 1000,
-		  (time_after_pub - time_after_fill).count() / 1000);
+		    const auto time_after_pub = std::chrono::steady_clock::now();
+	    	    RCLCPP_DEBUG(
+		    Me::kNode_->get_logger(),
+		    "local Time to fill msg: %ld us. Time to publish: %ld us",
+		    (time_after_fill - start_time).count() / 1000,
+		    (time_after_pub - time_after_fill).count() / 1000);
+  		  }
+  		  else {
+  		    const auto start_time = std::chrono::steady_clock::now();
+  		    
+  		    sensor_msgs::msg::Image image;
+		    const auto frame_id =
+		    Me::kNode_->get_parameter(kCamBaseFrame[cam_id]).get_value<std::string>();
+		    const rclcpp::Time stamp = Me::kNode_->get_clock()->now();
+		    Me::FillImageMsg_Local_(buffer, size, stamp, frame_id, image, Me::kNode_->encoding_);
+		    
+		    const auto time_after_fill = std::chrono::steady_clock::now();
+		    
+		    kImagePubs[cam_id].publish(image);
+
+		    const auto time_after_pub = std::chrono::steady_clock::now();
+	    	    RCLCPP_DEBUG(
+		    Me::kNode_->get_logger(),
+		    "local Time to fill msg: %ld us. Time to publish: %ld us",
+		    (time_after_fill - start_time).count() / 1000,
+		    (time_after_pub - time_after_fill).count() / 1000);
+		  }
 	  }
 	  return 0;
 	},
@@ -235,6 +287,7 @@ private:
   // needed because clpe callback does not support user data :(.
   static Me * kNode_;
   static std::unordered_map<int, image_transport::Publisher> kImagePubs;
+  static std::unordered_map<int, rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr> jpeg_pub;
   std::string encoding_;
   std::string timestamp_;
   std::array<bool, 8> cam_enabled_;
@@ -384,6 +437,16 @@ private:
       cv_image->toImageMsg(image);
     }
   }
+  
+  static void FillImageMsg_Compressed_(
+    unsigned char * buffer, unsigned int size, const rclcpp::Time & stamp,
+    const std::string & frame_id, sensor_msgs::msg::CompressedImage & image)
+  {
+    image.header.frame_id = frame_id;
+    image.format = "jpeg";
+    image.data.resize(size);
+    std::copy(buffer, (buffer) + (size), image.data.begin());
+  }
 
 /*
   std::error_code GetCameraImage_(int cam_id, sensor_msgs::msg::Image & image)
@@ -459,6 +522,9 @@ private:
 
 template<typename ClpeClientApi>
 ClpeNode<ClpeClientApi> * ClpeNode<ClpeClientApi>::kNode_;
+
+template<typename ClpeClientApi>
+std::unordered_map<int, rclcpp::Publisher<sensor_msgs::msg::CompressedImage>::SharedPtr> ClpeNode<ClpeClientApi>::jpeg_pub;
 
 template<typename ClpeClientApi>
 std::unordered_map<int, image_transport::Publisher> ClpeNode<ClpeClientApi>::kImagePubs;
