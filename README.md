@@ -121,6 +121,7 @@ ros2 component list
 # Configuration
 
 The driver supports the following ROS parameters to configure its behavior. The `password`, `slave`, `encoding` and `timestamp` parameters can be overwritten at run time. Other parameters can be modified within the [launch file](launch/clpe_ros.launch.py).
+> Note: If encoding is "jpeg", timestamp must be set to "local".
 
 | Key | Description | Default |
 |-|-|-|
