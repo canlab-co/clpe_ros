@@ -95,7 +95,9 @@ ros2 launch clpe_ros clpe_ros.launch.py password:=<sudo-password> slave:=n encod
 > If you have not equipped slave CLPE-G-Series, you should enter `slave:=n`
 
 By default the driver will publish topics per camera X.
-* /clpe/cam_X/image_raw: The raw image published as `sensor_msgs::msg::Image`. The default encoding is `yuv422`. For other supported encodings, see Configuration below.
+* /clpe/cam_X/image_raw: The raw image published as `sensor_msgs::msg::Image`.
+* /clpe/cam_X/compressed: The JPEG image published as `sensor_msgs::msg::CompressedImage`.
+* The default encoding is `yuv422`. For other supported encodings, see Configuration below.
 
 
 ## ROS2 Component
