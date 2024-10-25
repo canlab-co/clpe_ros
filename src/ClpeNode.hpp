@@ -357,6 +357,7 @@ private:
     image->format = "jpeg";
     image->data.resize(size);
     std::copy(buffer, (buffer) + (size), image->data.begin());
+    image.header.stamp = stamp;
  }
   
 /*
