@@ -98,6 +98,12 @@ static constexpr const char* kCamInfoQueueSize[] = { "cam_0_info_queue_size", "c
                                                      "cam_4_info_queue_size", "cam_5_info_queue_size", 
                                                      "cam_6_info_queue_size", "cam_7_info_queue_size" };
 
+// sensor info
+static int caminfo = 0;
+// resolution
+static int image_width = 0;
+static int image_height = 0;
+
 template <typename ClpeClientApi>
 class ClpeNode : public ros::NodeHandle, public std::enable_shared_from_this<ClpeNode<ClpeClientApi>>
 {
@@ -142,6 +148,21 @@ public:
     {
       ROS_FATAL("Failed to initiate the clpe network connection (%s)", ConnectionError::get().message(result).c_str());
       exit(result);
+    }
+    // get sensor info
+    this->clpe_api.Clpe_GetSensorInfo(&caminfo);
+    if (caminfo == 0) {
+      ROS_INFO("Camera Sensor : IMX390 (1920X1080)");
+      image_width = 1920;
+      image_height = 1080;
+    }
+    else if (caminfo == 1) {
+      ROS_INFO("Camera Sensor : AR0233 (2048X1280)");
+      image_width = 2048;
+      image_height = 1280;
+    }
+    else {
+      // else
     }
 
     // publish tf
@@ -313,10 +334,10 @@ private:
     // copy the data out to avoid UB.
     image.data = std::vector<uint8_t>(buffer, buffer + size);
     image.encoding = sensor_msgs::image_encodings::YUV422;
-    image.width = 1920;
-    image.height = 1080;
+    image.width = image_width;
+    image.height = image_height;
     // assume that each row is same sized.
-    image.step = size / 1080;
+    image.step = size / image_height;
     image.is_bigendian = false;
     image.header.stamp.sec = camera_timeStamp->tv_sec;
     image.header.stamp.nsec = (camera_timeStamp->tv_usec) * 1000;
@@ -336,10 +357,10 @@ private:
     // copy the data out to avoid UB.
     image.data = std::vector<uint8_t>(buffer, buffer + size);
     image.encoding = sensor_msgs::image_encodings::YUV422;
-    image.width = 1920;
-    image.height = 1080;
+    image.width = image_width;
+    image.height = image_height;
     // assume that each row is same sized.
-    image.step = size / 1080;
+    image.step = size / image_height;
     image.is_bigendian = false;
     image.header.stamp = stamp;
 
