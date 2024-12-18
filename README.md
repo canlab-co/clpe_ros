@@ -6,6 +6,13 @@ This drivers exposes camera images and information from CLPE-G-Series as ROS mes
 
 **This branch contains the `ROS 2` driver. For the `ROS 1` driver, please switch to the `noetic` branch.**
 
+# Environment(PC Specification)
+* PC Model: Nuvo-8208GC
+* CPU Cores : 12
+* CPU Clock : 3.7Ghz
+* DRAM Size : 64GB (32GB + 32GB)
+* DRAM Type : DDR4
+
 # System Requirements
 
 Requirements:
@@ -99,6 +106,14 @@ By default the driver will publish topics per camera X.
 * /clpe/cam_X/compressed: The JPEG image published as `sensor_msgs::msg::CompressedImage`.
 * The default encoding is `yuv422`. For other supported encodings, see Configuration below.
 
+## Frame rate per sensor
+
+* CLCC-G-01X 8CH  
+UYVY - 30 fps  
+JPEG - 30 fps
+* CLCC-G-02X 8CH  
+UYVY - 24~25 fps  
+JPEG - 30 fps
 
 ## ROS2 Component
 
